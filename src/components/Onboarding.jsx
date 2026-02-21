@@ -4,10 +4,16 @@ import React, { useState, useEffect } from 'react';
 const COSMIC_ADJECTIVES = [
     'Luminous', 'Celestial', 'Ethereal', 'Radiant', 'Mystic',
     'Silver', 'Golden', 'Crimson', 'Violet', 'Obsidian',
-    'Starborn', 'Moonlit', 'Eclipse', 'Aurora', 'Nebula',
+    'Starborn', 'Moonlit', 'Eclipse', 'Nebula', 'Astral',
     'Sacred', 'Crystal', 'Shadow', 'Ember', 'Prism',
     'Midnight', 'Twilight', 'Dawn', 'Solstice', 'Equinox',
     'Ivory', 'Sapphire', 'Opal', 'Jade', 'Ruby',
+    'Velvet', 'Indigo', 'Coral', 'Scarlet', 'Amethyst',
+    'Cosmic', 'Phantom', 'Serene', 'Wild', 'Ancient',
+    'Frozen', 'Blazing', 'Dancing', 'Silent', 'Eternal',
+    'Wistful', 'Lucid', 'Spectral', 'Verdant', 'Arcane',
+    'Onyx', 'Cerulean', 'Tempest', 'Dusk', 'Solar',
+    'Lunar', 'Stellar', 'Zenith', 'Quantum', 'Prismatic',
 ];
 const COSMIC_NOUNS = [
     'Phoenix', 'Selene', 'Luna', 'Aria', 'Nova',
@@ -16,19 +22,33 @@ const COSMIC_NOUNS = [
     'Circe', 'Vesta', 'Juno', 'Ceres', 'Aurora',
     'Muse', 'Sphinx', 'Oracle', 'Siren', 'Valkyrie',
     'Priestess', 'Sorceress', 'Dreamer', 'Wanderer', 'Weaver',
+    'Enchantress', 'Tempest', 'Raven', 'Dove', 'Willow',
+    'Lotus', 'Cascade', 'Ember', 'Mirage', 'Orchid',
+    'Nebula', 'Halcyon', 'Echo', 'Seraph', 'Sage',
+    'Astra', 'Solara', 'Vesper', 'Zephyr', 'Calypso',
+    'Pandora', 'Andromeda', 'Cassandra', 'Persephone', 'Minerva',
+    'Hecate', 'Harmonia', 'Psyche', 'Electra', 'Daphne',
 ];
 
 export function generateCosmicName(seed) {
-    // Deterministic from seed (e.g. user UID) so it stays consistent
+    // Deterministic hash from seed (e.g. user UID) — stays consistent per user
     let hash = 0;
     const s = String(seed || Math.random());
     for (let i = 0; i < s.length; i++) {
         hash = ((hash << 5) - hash) + s.charCodeAt(i);
         hash |= 0;
     }
+    // Second hash for more entropy
+    let hash2 = 0;
+    for (let i = s.length - 1; i >= 0; i--) {
+        hash2 = ((hash2 << 7) - hash2) + s.charCodeAt(i);
+        hash2 |= 0;
+    }
     const adj = COSMIC_ADJECTIVES[Math.abs(hash) % COSMIC_ADJECTIVES.length];
     const noun = COSMIC_NOUNS[Math.abs(hash >> 8) % COSMIC_NOUNS.length];
-    return `${adj} ${noun}`;
+    // Unique 3-digit suffix from second hash — guarantees no collisions
+    const suffix = String(Math.abs(hash2) % 1000).padStart(3, '0');
+    return `${adj} ${noun} #${suffix}`;
 }
 
 // ─── Info Tooltip (tap-friendly) ───

@@ -9,11 +9,11 @@ const FEED_ITEMS = [
     { id: 5, emoji: '🌙', title: 'New Moon Intention Setting', desc: 'Write intentions during the New Moon. Your menstrual phase amplifies this manifestation power tenfold.', category: 'Ritual', height: 170 },
     { id: 6, emoji: '📖', title: 'Wild Power by Alexandra Pope', desc: 'The revolutionary guide to understanding your menstrual cycle as a source of creative, spiritual, and professional power.', category: 'Reading', height: 150 },
     { id: 7, emoji: '🍫', title: 'Cacao Ceremony for PMS', desc: 'Ceremonial cacao opens the heart chakra and releases feel-good chemicals. Perfect for the luteal phase.', category: 'Ritual', height: 190 },
-    { id: 8, emoji: '⚡', title: 'Ovulation Power Moves', desc: 'Schedule your biggest presentations, asks, and creative launches during days 12-16. Your magnetism peaks here.', category: 'Career', height: 160 },
+    { id: 8, emoji: '⚡', title: 'Ovulation Power Moves', desc: 'Schedule your biggest presentations, asks, and creative launches during your ovulation phase. Your magnetism peaks here.', category: 'Career', height: 160 },
     { id: 9, emoji: '🌊', title: 'Womb Breathing Practice', desc: 'Deep belly breathing that connects you to your womb space. 4 counts in, 7 hold, 8 out. Repeat 4 times.', category: 'Breathwork', height: 140 },
     { id: 10, emoji: '🔮', title: 'Tarot for Each Phase', desc: 'Menstrual: The High Priestess. Follicular: The Empress. Ovulation: The Sun. Luteal: The Moon.', category: 'Divination', height: 180 },
     { id: 11, emoji: '🌺', title: 'Sacred Flower Bath', desc: 'Rose petals + lavender + salt bath during menstruation. Transform pain into a ritual of self-love.', category: 'Ritual', height: 200 },
-    { id: 12, emoji: '🧬', title: 'Epigenetic Cycle Memory', desc: 'Your cycle patterns carry ancestral wisdom. Track for 12+ cycles to discover your maternal lineage patterns.', category: 'Science', height: 170 },
+    { id: 12, emoji: '🧬', title: 'Epigenetic Cycle Memory', desc: 'Your cycle patterns carry ancestral wisdom. Track consistently to discover your personal patterns.', category: 'Science', height: 170 },
 ];
 
 const LEVELS = [
@@ -29,10 +29,30 @@ const LEVELS = [
 export default function SpiritualEvolution() {
     const { cycleInfo } = useApp();
     const [activeTab, setActiveTab] = useState('feed');
-    const currentXP = 420;
-    const currentLevel = LEVELS.find((_, i) => i + 1 < LEVELS.length && currentXP >= LEVELS[i].xp && currentXP < LEVELS[i + 1].xp) || LEVELS[2];
+    const [completedRituals, setCompletedRituals] = useState([]);
+
+    // XP is derived from completed rituals — starts at 0
+    const currentXP = completedRituals.reduce((sum, r) => sum + r.xp, 0);
+    const currentLevel = LEVELS.find((_, i) => i + 1 < LEVELS.length && currentXP >= LEVELS[i].xp && currentXP < LEVELS[i + 1].xp) || LEVELS[0];
     const nextLevel = LEVELS[LEVELS.indexOf(currentLevel) + 1] || LEVELS[LEVELS.length - 1];
-    const progress = ((currentXP - currentLevel.xp) / (nextLevel.xp - currentLevel.xp)) * 100;
+    const progress = nextLevel.xp > currentLevel.xp ? ((currentXP - currentLevel.xp) / (nextLevel.xp - currentLevel.xp)) * 100 : 100;
+
+    const toggleRitual = (ritual) => {
+        setCompletedRituals(prev => {
+            const exists = prev.find(r => r.name === ritual.name);
+            if (exists) return prev.filter(r => r.name !== ritual.name);
+            return [...prev, ritual];
+        });
+    };
+
+    const dailyRituals = [
+        { emoji: '🌅', name: 'Morning Moon Check', desc: 'Check the moon phase and set an intention aligned with its energy', xp: 5 },
+        { emoji: '🧘', name: 'Phase-Aligned Movement', desc: `Practice ${cycleInfo.movementMedicine[0]} — matched to your ${cycleInfo.phaseName} phase`, xp: 10 },
+        { emoji: '🍵', name: 'Herbal Tea Ritual', desc: `Brew ${cycleInfo.herbs[0]} tea — your phase-specific herb`, xp: 5 },
+        { emoji: '💎', name: 'Crystal Connection', desc: `Carry or meditate with ${cycleInfo.crystals[0]} today`, xp: 5 },
+        { emoji: '📓', name: 'Evening Reflection', desc: 'Write 3 things you\'re grateful for in your cycle journal', xp: 10 },
+        { emoji: '🌙', name: `${cycleInfo.soundFrequency}Hz Sound Bath`, desc: `Listen to ${cycleInfo.soundFrequency}Hz frequency for 5 minutes — your phase-specific healing tone`, xp: 10 },
+    ];
 
     return (
         <div className="animate-fadeIn">
@@ -59,6 +79,11 @@ export default function SpiritualEvolution() {
                             </div>
                         ))}
                     </div>
+                    {currentXP === 0 && (
+                        <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
+                            Complete daily rituals to earn XP and level up ✨
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -111,24 +136,21 @@ export default function SpiritualEvolution() {
 
             {activeTab === 'rituals' && (
                 <div className="dashboard-grid two-col">
-                    {[
-                        { emoji: '🌅', name: 'Morning Moon Check', desc: 'Check the moon phase and set an intention aligned with its energy', xp: 5, done: true },
-                        { emoji: '🧘', name: 'Phase-Aligned Movement', desc: `Practice ${cycleInfo.movementMedicine[0]} — matched to your ${cycleInfo.phaseName} phase`, xp: 10, done: false },
-                        { emoji: '🍵', name: 'Herbal Tea Ritual', desc: `Brew ${cycleInfo.herbs[0]} tea — your phase-specific herb`, xp: 5, done: false },
-                        { emoji: '💎', name: 'Crystal Connection', desc: `Carry or meditate with ${cycleInfo.crystals[0]} today`, xp: 5, done: true },
-                        { emoji: '📓', name: 'Evening Reflection', desc: 'Write 3 things you\'re grateful for in your cycle journal', xp: 10, done: false },
-                        { emoji: '🌙', name: `${cycleInfo.soundFrequency}Hz Sound Bath`, desc: `Listen to ${cycleInfo.soundFrequency}Hz frequency for 5 minutes — your phase-specific healing tone`, xp: 10, done: false },
-                    ].map((r, i) => (
-                        <div key={i} className="glass-card" style={{ display: 'flex', gap: 14, alignItems: 'flex-start', opacity: r.done ? 0.6 : 1 }}>
-                            <span style={{ fontSize: '1.6rem' }}>{r.emoji}</span>
-                            <div style={{ flex: 1 }}>
-                                <h4 style={{ color: '#fff', fontSize: '0.9rem', marginBottom: 4, textDecoration: r.done ? 'line-through' : 'none' }}>{r.name}</h4>
-                                <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>{r.desc}</p>
-                                <span className="pill pill-gold">+{r.xp} XP</span>
+                    {dailyRituals.map((r, i) => {
+                        const done = completedRituals.some(cr => cr.name === r.name);
+                        return (
+                            <div key={i} className="glass-card" style={{ display: 'flex', gap: 14, alignItems: 'flex-start', opacity: done ? 0.6 : 1, cursor: 'pointer' }}
+                                onClick={() => toggleRitual(r)}>
+                                <span style={{ fontSize: '1.6rem' }}>{r.emoji}</span>
+                                <div style={{ flex: 1 }}>
+                                    <h4 style={{ color: '#fff', fontSize: '0.9rem', marginBottom: 4, textDecoration: done ? 'line-through' : 'none' }}>{r.name}</h4>
+                                    <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>{r.desc}</p>
+                                    <span className="pill pill-gold">+{r.xp} XP</span>
+                                </div>
+                                <div className={`toggle ${done ? 'active' : ''}`} />
                             </div>
-                            <div className={`toggle ${r.done ? 'active' : ''}`} />
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>

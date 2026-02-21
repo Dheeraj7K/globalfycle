@@ -6,7 +6,7 @@ export default function AIInsights() {
     const { cycleInfo, moonData, noosphere, syncStats } = useApp();
     const [messages, setMessages] = useState([
         ...AI_INITIAL_MESSAGES,
-        { from: 'ai', text: `📊 Your Quick Stats: Day ${cycleInfo.dayOfCycle} (${cycleInfo.phaseName}) • ${moonData.phaseName} (${moonData.illumination}%) • Noosphere: ${noosphere.index} • ${syncStats?.synced?.toLocaleString() || '—'} women synced globally` }
+        { from: 'ai', text: `📊 Your Quick Stats: Day ${cycleInfo.dayOfCycle} of ${cycleInfo.totalDays} (${cycleInfo.phaseName} Phase) • ${moonData.emoji} ${moonData.phaseName} (${moonData.illumination}% illuminated) • Noosphere Index: ${noosphere.index}` }
     ]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);

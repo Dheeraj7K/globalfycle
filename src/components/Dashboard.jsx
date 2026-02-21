@@ -31,8 +31,8 @@ export default function Dashboard() {
                 <div className="glass-card stat-card">
                     <div className="stat-icon teal">🌍</div>
                     <div>
-                        <div className="stat-value">{syncStats ? syncStats.synced.toLocaleString() : '—'}</div>
-                        <div className="stat-label">Women Synced Globally</div>
+                        <div className="stat-value">{syncStats && syncStats.synced > 0 ? syncStats.synced.toLocaleString() : '—'}</div>
+                        <div className="stat-label">Global Sync</div>
                     </div>
                 </div>
                 <div className="glass-card stat-card">

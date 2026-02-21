@@ -124,6 +124,98 @@ export function getZodiacSign(date = new Date()) {
     return signs[0]; // Default Capricorn
 }
 
+// ─── Natal Chart from Birth Data ───
+export function getNatalChart(dob, birthTime, birthPlace) {
+    if (!dob) return null;
+
+    const birthDate = new Date(dob);
+    const sunSign = getZodiacSign(birthDate);
+
+    // ─── Moon Sign (approximate from lunar position at birth) ───
+    const ZODIAC_ORDER = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+        'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+    const SIGN_EMOJIS = {
+        Aries: '♈', Taurus: '♉', Gemini: '♊', Cancer: '♋', Leo: '♌', Virgo: '♍',
+        Libra: '♎', Scorpio: '♏', Sagittarius: '♐', Capricorn: '♑', Aquarius: '♒', Pisces: '♓'
+    };
+    const ELEMENTS = {
+        Aries: 'Fire', Taurus: 'Earth', Gemini: 'Air', Cancer: 'Water',
+        Leo: 'Fire', Virgo: 'Earth', Libra: 'Air', Scorpio: 'Water',
+        Sagittarius: 'Fire', Capricorn: 'Earth', Aquarius: 'Air', Pisces: 'Water'
+    };
+    const MODALITIES = {
+        Aries: 'Cardinal', Taurus: 'Fixed', Gemini: 'Mutable', Cancer: 'Cardinal',
+        Leo: 'Fixed', Virgo: 'Mutable', Libra: 'Cardinal', Scorpio: 'Fixed',
+        Sagittarius: 'Mutable', Capricorn: 'Cardinal', Aquarius: 'Fixed', Pisces: 'Mutable'
+    };
+    const RULERS = {
+        Aries: 'Mars', Taurus: 'Venus', Gemini: 'Mercury', Cancer: 'Moon',
+        Leo: 'Sun', Virgo: 'Mercury', Libra: 'Venus', Scorpio: 'Pluto',
+        Sagittarius: 'Jupiter', Capricorn: 'Saturn', Aquarius: 'Uranus', Pisces: 'Neptune'
+    };
+
+    // Moon moves ~13.2° per day, completing the zodiac in ~27.3 days
+    // Use the same lunar algorithm to find where the moon was at birth
+    const moonPhaseAtBirth = getMoonPhase(birthDate);
+    const moonZodiacIndex = Math.floor((moonPhaseAtBirth.phase / 27.3) * 12) % 12;
+    const moonSign = ZODIAC_ORDER[moonZodiacIndex];
+
+    // ─── Rising Sign (Ascendant) — approximation from birth time ───
+    // The ascendant changes every ~2 hours through the zodiac
+    // At sunrise the ascendant = sun sign. Each 2hr block advances one sign.
+    let risingSign = null;
+    let risingAvailable = false;
+    if (birthTime && birthTime.includes(':')) {
+        const [h] = birthTime.split(':').map(Number);
+        // Sunrise approximation = 6 AM. Hours from sunrise / 2 = signs offset from sun sign
+        const hoursFromSunrise = ((h - 6) + 24) % 24;
+        const signOffset = Math.floor(hoursFromSunrise / 2);
+        const sunIndex = ZODIAC_ORDER.indexOf(sunSign.sign);
+        const risingIndex = (sunIndex + signOffset) % 12;
+        risingSign = ZODIAC_ORDER[risingIndex];
+        risingAvailable = true;
+    }
+
+    // ─── Element Balance ───
+    const signs = [sunSign.sign, moonSign, risingSign].filter(Boolean);
+    const elementCount = { Fire: 0, Earth: 0, Air: 0, Water: 0 };
+    signs.forEach(s => { if (ELEMENTS[s]) elementCount[ELEMENTS[s]]++; });
+    const dominantElement = Object.entries(elementCount).sort((a, b) => b[1] - a[1])[0][0];
+
+    // ─── Modality Balance ───
+    const modalityCount = { Cardinal: 0, Fixed: 0, Mutable: 0 };
+    signs.forEach(s => { if (MODALITIES[s]) modalityCount[MODALITIES[s]]++; });
+    const dominantModality = Object.entries(modalityCount).sort((a, b) => b[1] - a[1])[0][0];
+
+    return {
+        sunSign: {
+            sign: sunSign.sign,
+            emoji: sunSign.emoji || SIGN_EMOJIS[sunSign.sign],
+            element: sunSign.element,
+            ruler: RULERS[sunSign.sign],
+        },
+        moonSign: {
+            sign: moonSign,
+            emoji: SIGN_EMOJIS[moonSign],
+            element: ELEMENTS[moonSign],
+            ruler: RULERS[moonSign],
+            note: 'Approximate — based on lunar position at birth date',
+        },
+        risingSign: risingAvailable ? {
+            sign: risingSign,
+            emoji: SIGN_EMOJIS[risingSign],
+            element: ELEMENTS[risingSign],
+            ruler: RULERS[risingSign],
+            note: 'Approximate — based on birth hour (exact requires location coordinates)',
+        } : null,
+        dominantElement,
+        elementBalance: elementCount,
+        dominantModality,
+        modalityBalance: modalityCount,
+        birthPlace: birthPlace || null,
+    };
+}
+
 // Planetary positions (simplified ephemeris)
 export function getPlanetaryPositions(date = new Date()) {
     const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));

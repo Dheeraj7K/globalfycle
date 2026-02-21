@@ -1,16 +1,106 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../App';
-import { SYMPTOMS, MOODS, FLOW_LEVELS } from '../utils/cycleEngine';
+import {
+    SYMPTOMS, MOODS, FLOW_LEVELS,
+    DISCHARGE_OPTIONS, SEX_OPTIONS, SEX_DRIVE_OPTIONS,
+    DIGESTIVE_OPTIONS, PREGNANCY_TEST_OPTIONS, OVULATION_TEST_OPTIONS,
+    CONTRACEPTIVE_OPTIONS, EMERGENCY_CONTRACEPTIVE_OPTIONS,
+} from '../utils/cycleEngine';
+import { getDailyLog } from '../firebase';
+
+function Section({ title, icon, children, defaultOpen = false }) {
+    const [open, setOpen] = useState(defaultOpen);
+    return (
+        <div className="glass-card" style={{ marginBottom: 12 }}>
+            <div className="section-header" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => setOpen(o => !o)}>
+                <span className="section-icon">{icon}</span>
+                <h3 style={{ flex: 1 }}>{title}</h3>
+                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </div>
+            {open && <div style={{ marginTop: 12 }}>{children}</div>}
+        </div>
+    );
+}
+
+function OptionGrid({ options, selected, onSelect, multi = false }) {
+    return (
+        <div className="quick-log-grid">
+            {options.map(o => (
+                <button
+                    key={o.id}
+                    className={`quick-log-btn ${multi ? (selected?.includes?.(o.id) ? 'selected' : '') : (selected === o.id ? 'selected' : '')}`}
+                    onClick={() => onSelect(o.id)}
+                >
+                    <span className="log-emoji">{o.emoji}</span>
+                    {o.label}
+                </button>
+            ))}
+        </div>
+    );
+}
 
 export default function CycleTracker() {
-    const { cycleInfo, dailyLog, setDailyLog, cycleData, setCycleData } = useApp();
+    const { cycleInfo, dailyLog, setDailyLog, cycleData, setCycleData, user, periodLogs, logHistory, handlePeriodLog } = useApp();
     const [activeTab, setActiveTab] = useState('log');
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [localLog, setLocalLog] = useState({ ...dailyLog });
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+
+    const today = new Date().toISOString().split('T')[0];
+    const isToday = selectedDate === today;
+
+    // Load log for selected date
+    useEffect(() => {
+        if (isToday) {
+            setLocalLog({ ...dailyLog });
+        } else if (user?.uid) {
+            getDailyLog(user.uid, selectedDate).then(log => {
+                setLocalLog(log || { symptoms: [], mood: null, flow: 0, notes: '', discharge: null, sexActivity: null, sexDrive: null, digestive: null, pregnancyTest: null, ovulationTest: null, contraceptive: null, emergencyContraceptive: null });
+            });
+        }
+    }, [selectedDate, dailyLog]);
+
+    const updateLocal = (field, value) => {
+        setLocalLog(prev => ({ ...prev, [field]: value }));
+        setSaved(false);
+    };
 
     const toggleSymptom = (id) => {
-        setDailyLog(prev => ({
+        setLocalLog(prev => ({
             ...prev,
             symptoms: prev.symptoms.includes(id) ? prev.symptoms.filter(s => s !== id) : [...prev.symptoms, id],
         }));
+        setSaved(false);
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await setDailyLog(localLog, selectedDate);
+            setSaved(true);
+        } catch (err) {
+            console.warn('Save failed:', err);
+        }
+        setSaving(false);
+    };
+
+    const handlePeriodStarted = () => {
+        handlePeriodLog(selectedDate, null);
+        updateLocal('flow', Math.max(localLog.flow, 2));
+    };
+
+    const handlePeriodEnded = () => {
+        // Find the most recent period that has no end date
+        const openPeriod = periodLogs.find(p => !p.endDate);
+        if (openPeriod) {
+            handlePeriodLog(openPeriod.startDate, selectedDate);
+        }
+    };
+
+    const formatDate = (dateStr) => {
+        const d = new Date(dateStr + 'T12:00:00');
+        return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     return (
@@ -27,56 +117,122 @@ export default function CycleTracker() {
             </div>
 
             {activeTab === 'log' && (
-                <div className="dashboard-grid two-col">
-                    {/* Flow Tracker */}
-                    <div className="glass-card">
-                        <div className="section-header"><span className="section-icon">🩸</span><h3>Flow Level</h3></div>
-                        <div className="flow-slider-container">
-                            <input type="range" className="flow-slider" min="0" max="5" value={dailyLog.flow}
-                                onChange={e => setDailyLog(prev => ({ ...prev, flow: parseInt(e.target.value) }))} />
-                            <div className="flow-labels">
-                                {FLOW_LEVELS.map(f => <span key={f.id}>{f.label}</span>)}
-                            </div>
-                        </div>
-                        <div style={{ textAlign: 'center', marginTop: 12, fontSize: '0.85rem', color: FLOW_LEVELS[dailyLog.flow].color }}>
-                            {FLOW_LEVELS[dailyLog.flow].label}
-                        </div>
-
-                        <div style={{ marginTop: 24 }}>
-                            <div className="section-header"><span className="section-icon">😊</span><h3>Mood</h3></div>
-                            <div className="quick-log-grid">
-                                {MOODS.map(m => (
-                                    <button key={m.id} className={`quick-log-btn ${dailyLog.mood === m.id ? 'selected' : ''}`}
-                                        onClick={() => setDailyLog(prev => ({ ...prev, mood: m.id }))}>
-                                        <span className="log-emoji">{m.emoji}</span>
-                                        {m.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                <div>
+                    {/* Date Selector */}
+                    <div className="glass-card" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, padding: '12px 16px' }}>
+                        <span style={{ fontSize: '1.2rem' }}>📅</span>
+                        <input
+                            type="date"
+                            className="input-field"
+                            style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', colorScheme: 'dark' }}
+                            value={selectedDate}
+                            max={today}
+                            onChange={e => setSelectedDate(e.target.value)}
+                        />
+                        {!isToday && (
+                            <button className="btn btn-ghost btn-sm" onClick={() => setSelectedDate(today)}>
+                                Today
+                            </button>
+                        )}
                     </div>
 
-                    {/* Symptoms */}
-                    <div className="glass-card">
-                        <div className="section-header"><span className="section-icon">🏥</span><h3>Symptoms</h3></div>
-                        <div className="quick-log-grid">
-                            {SYMPTOMS.map(s => (
-                                <button key={s.id} className={`quick-log-btn ${dailyLog.symptoms.includes(s.id) ? 'selected' : ''}`}
-                                    onClick={() => toggleSymptom(s.id)}>
-                                    <span className="log-emoji">{s.emoji}</span>
-                                    {s.label}
-                                </button>
-                            ))}
-                        </div>
-                        <div style={{ marginTop: 16 }}>
-                            <textarea className="input-field" placeholder="Additional notes for today..."
-                                value={dailyLog.notes} onChange={e => setDailyLog(prev => ({ ...prev, notes: e.target.value }))}
-                                style={{ minHeight: 80, resize: 'vertical' }} />
-                        </div>
-                        <button className="btn btn-primary" style={{ marginTop: 12, width: '100%', justifyContent: 'center' }}>
-                            ✨ Save Today's Log
+                    {/* Period Start/End */}
+                    <div className="glass-card" style={{ marginBottom: 16, display: 'flex', gap: 10 }}>
+                        <button
+                            className="btn btn-primary"
+                            style={{ flex: 1, justifyContent: 'center', background: 'rgba(255,45,120,0.2)', border: '1px solid rgba(255,45,120,0.4)', color: '#ff2d78' }}
+                            onClick={handlePeriodStarted}
+                        >
+                            🩸 Period Started
+                        </button>
+                        <button
+                            className="btn btn-primary"
+                            style={{ flex: 1, justifyContent: 'center', background: 'rgba(0,245,212,0.1)', border: '1px solid rgba(0,245,212,0.3)', color: '#00f5d4' }}
+                            onClick={handlePeriodEnded}
+                        >
+                            ✓ Period Ended
                         </button>
                     </div>
+
+                    <div className="dashboard-grid two-col">
+                        {/* Left Column */}
+                        <div>
+                            <Section title="Flow Level" icon="🩸" defaultOpen={true}>
+                                <div className="flow-slider-container">
+                                    <input type="range" className="flow-slider" min="0" max="5" value={localLog.flow}
+                                        onChange={e => updateLocal('flow', parseInt(e.target.value))} />
+                                    <div className="flow-labels">
+                                        {FLOW_LEVELS.map(f => <span key={f.id}>{f.label}</span>)}
+                                    </div>
+                                </div>
+                                <div style={{ textAlign: 'center', marginTop: 8, fontSize: '0.85rem', color: FLOW_LEVELS[localLog.flow].color }}>
+                                    {FLOW_LEVELS[localLog.flow].label}
+                                </div>
+                            </Section>
+
+                            <Section title="Mood" icon="😊" defaultOpen={true}>
+                                <OptionGrid options={MOODS} selected={localLog.mood} onSelect={(id) => updateLocal('mood', localLog.mood === id ? null : id)} />
+                            </Section>
+
+                            <Section title="Symptoms" icon="🏥" defaultOpen={true}>
+                                <OptionGrid options={SYMPTOMS} selected={localLog.symptoms} onSelect={toggleSymptom} multi={true} />
+                            </Section>
+
+                            <Section title="Notes" icon="📝">
+                                <textarea className="input-field" placeholder="How are you feeling today?"
+                                    value={localLog.notes || ''} onChange={e => updateLocal('notes', e.target.value)}
+                                    style={{ minHeight: 80, resize: 'vertical', width: '100%' }} />
+                            </Section>
+                        </div>
+
+                        {/* Right Column */}
+                        <div>
+                            <Section title="Vaginal Discharge" icon="💧">
+                                <OptionGrid options={DISCHARGE_OPTIONS} selected={localLog.discharge} onSelect={(id) => updateLocal('discharge', localLog.discharge === id ? null : id)} />
+                            </Section>
+
+                            <Section title="Sex & Sex Drive" icon="💑">
+                                <div style={{ marginBottom: 12 }}>
+                                    <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Activity</div>
+                                    <OptionGrid options={SEX_OPTIONS} selected={localLog.sexActivity} onSelect={(id) => updateLocal('sexActivity', localLog.sexActivity === id ? null : id)} />
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Drive</div>
+                                    <OptionGrid options={SEX_DRIVE_OPTIONS} selected={localLog.sexDrive} onSelect={(id) => updateLocal('sexDrive', localLog.sexDrive === id ? null : id)} />
+                                </div>
+                            </Section>
+
+                            <Section title="Digestive & Stool" icon="🫄">
+                                <OptionGrid options={DIGESTIVE_OPTIONS} selected={localLog.digestive} onSelect={(id) => updateLocal('digestive', localLog.digestive === id ? null : id)} />
+                            </Section>
+
+                            <Section title="Pregnancy Test" icon="🤰">
+                                <OptionGrid options={PREGNANCY_TEST_OPTIONS} selected={localLog.pregnancyTest} onSelect={(id) => updateLocal('pregnancyTest', localLog.pregnancyTest === id ? null : id)} />
+                            </Section>
+
+                            <Section title="Ovulation Test" icon="🧪">
+                                <OptionGrid options={OVULATION_TEST_OPTIONS} selected={localLog.ovulationTest} onSelect={(id) => updateLocal('ovulationTest', localLog.ovulationTest === id ? null : id)} />
+                            </Section>
+
+                            <Section title="Oral Contraceptive" icon="💊">
+                                <OptionGrid options={CONTRACEPTIVE_OPTIONS} selected={localLog.contraceptive} onSelect={(id) => updateLocal('contraceptive', localLog.contraceptive === id ? null : id)} />
+                            </Section>
+
+                            <Section title="Emergency Contraceptive" icon="🆘">
+                                <OptionGrid options={EMERGENCY_CONTRACEPTIVE_OPTIONS} selected={localLog.emergencyContraceptive} onSelect={(id) => updateLocal('emergencyContraceptive', localLog.emergencyContraceptive === id ? null : id)} />
+                            </Section>
+                        </div>
+                    </div>
+
+                    {/* Save Button */}
+                    <button
+                        className="btn btn-primary"
+                        style={{ marginTop: 16, width: '100%', justifyContent: 'center', fontSize: '1rem', padding: '14px 24px' }}
+                        onClick={handleSave}
+                        disabled={saving}
+                    >
+                        {saving ? '⏳ Saving...' : saved ? '✅ Saved!' : `✨ Save Log for ${isToday ? 'Today' : formatDate(selectedDate)}`}
+                    </button>
                 </div>
             )}
 
@@ -157,24 +313,55 @@ export default function CycleTracker() {
                             <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>Ovulation Day</div>
                         </div>
                         <div className="glass-card" style={{ padding: 14, textAlign: 'center' }}>
-                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#a855f7' }}>12</div>
-                            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>Cycles Tracked</div>
+                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#a855f7' }}>{logHistory.length || '—'}</div>
+                            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>Days Logged</div>
                         </div>
                     </div>
-                    <div className="timeline">
-                        {[
-                            { date: 'Feb 9, 2026', content: 'Period started — Light flow, mild cramps' },
-                            { date: 'Jan 12, 2026', content: 'Period started — Medium flow, fatigue noted' },
-                            { date: 'Dec 15, 2025', content: 'Period started — Heavy flow, aligned with Full Moon' },
-                            { date: 'Nov 17, 2025', content: 'Period started — Light flow, high energy noted' },
-                            { date: 'Oct 20, 2025', content: 'Period started — Medium flow, synced with 3 friends' },
-                        ].map((entry, i) => (
-                            <div key={i} className="timeline-item">
-                                <div className="timeline-date">{entry.date}</div>
-                                <div className="timeline-content">{entry.content}</div>
+
+                    {/* Period Logs */}
+                    {periodLogs.length > 0 && (
+                        <div style={{ marginBottom: 20 }}>
+                            <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Period History</div>
+                            <div className="timeline">
+                                {periodLogs.map((p, i) => (
+                                    <div key={i} className="timeline-item">
+                                        <div className="timeline-date">{formatDate(p.startDate)}</div>
+                                        <div className="timeline-content">
+                                            Period started{p.endDate ? ` — ended ${formatDate(p.endDate)}` : ' — ongoing'}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    )}
+
+                    {/* Daily Log History */}
+                    {logHistory.length > 0 ? (
+                        <div>
+                            <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Daily Log History</div>
+                            <div className="timeline">
+                                {logHistory.slice(0, 20).map((entry, i) => {
+                                    const parts = [];
+                                    if (entry.flow > 0) parts.push(`Flow: ${FLOW_LEVELS[entry.flow]?.label || entry.flow}`);
+                                    if (entry.mood) parts.push(`Mood: ${MOODS.find(m => m.id === entry.mood)?.label || entry.mood}`);
+                                    if (entry.symptoms?.length) parts.push(`${entry.symptoms.length} symptom${entry.symptoms.length > 1 ? 's' : ''}`);
+                                    if (entry.discharge) parts.push(`Discharge: ${entry.discharge}`);
+                                    if (entry.contraceptive && entry.contraceptive !== 'na') parts.push(`Pill: ${entry.contraceptive}`);
+                                    return (
+                                        <div key={i} className="timeline-item">
+                                            <div className="timeline-date">{formatDate(entry.date || entry.id)}</div>
+                                            <div className="timeline-content">{parts.join(' • ') || 'Log entry'}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: 32, color: 'rgba(255,255,255,0.4)' }}>
+                            <div style={{ fontSize: '2rem', marginBottom: 8 }}>📝</div>
+                            <p>No logs yet. Start tracking in the Daily Log tab!</p>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

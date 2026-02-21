@@ -232,6 +232,70 @@ export const FLOW_LEVELS = [
     { id: 5, label: 'Very Heavy', color: 'rgba(255,45,120,1)' },
 ];
 
+// Vaginal discharge options
+export const DISCHARGE_OPTIONS = [
+    { id: 'none', emoji: '⚪', label: 'None' },
+    { id: 'sticky', emoji: '🫧', label: 'Sticky' },
+    { id: 'creamy', emoji: '🥛', label: 'Creamy' },
+    { id: 'watery', emoji: '💧', label: 'Watery' },
+    { id: 'egg_white', emoji: '🥚', label: 'Egg White' },
+    { id: 'unusual', emoji: '⚠️', label: 'Unusual Color' },
+];
+
+// Sex & sex drive options
+export const SEX_OPTIONS = [
+    { id: 'protected', emoji: '🛡️', label: 'Protected Sex' },
+    { id: 'unprotected', emoji: '💑', label: 'Unprotected Sex' },
+    { id: 'no_sex', emoji: '—', label: 'No Sex' },
+];
+
+export const SEX_DRIVE_OPTIONS = [
+    { id: 'high', emoji: '🔥', label: 'High' },
+    { id: 'normal', emoji: '😊', label: 'Normal' },
+    { id: 'low', emoji: '😴', label: 'Low' },
+    { id: 'none', emoji: '❌', label: 'None' },
+];
+
+// Digestive & stool options
+export const DIGESTIVE_OPTIONS = [
+    { id: 'normal', emoji: '✅', label: 'Normal' },
+    { id: 'constipation', emoji: '😣', label: 'Constipation' },
+    { id: 'diarrhea', emoji: '💨', label: 'Diarrhea' },
+    { id: 'gas_bloating', emoji: '🫧', label: 'Gas / Bloating' },
+    { id: 'loose', emoji: '⚠️', label: 'Loose Stool' },
+];
+
+// Pregnancy test results
+export const PREGNANCY_TEST_OPTIONS = [
+    { id: 'positive', emoji: '➕', label: 'Positive' },
+    { id: 'negative', emoji: '➖', label: 'Negative' },
+    { id: 'faint', emoji: '〰️', label: 'Faint Line' },
+    { id: 'not_taken', emoji: '—', label: 'Not Taken' },
+];
+
+// Ovulation test results
+export const OVULATION_TEST_OPTIONS = [
+    { id: 'positive', emoji: '➕', label: 'Positive' },
+    { id: 'negative', emoji: '➖', label: 'Negative' },
+    { id: 'almost', emoji: '〰️', label: 'Almost Positive' },
+    { id: 'not_taken', emoji: '—', label: 'Not Taken' },
+];
+
+// Oral contraceptive tracking
+export const CONTRACEPTIVE_OPTIONS = [
+    { id: 'taken', emoji: '💊', label: 'Taken' },
+    { id: 'missed', emoji: '❌', label: 'Missed' },
+    { id: 'late', emoji: '⏰', label: 'Taken Late' },
+    { id: 'na', emoji: '—', label: 'N/A' },
+];
+
+// Emergency contraceptive tracking
+export const EMERGENCY_CONTRACEPTIVE_OPTIONS = [
+    { id: 'taken_today', emoji: '🆘', label: 'Taken Today' },
+    { id: 'taken_recently', emoji: '📅', label: 'Taken Recently' },
+    { id: 'none', emoji: '—', label: 'Not Taken' },
+];
+
 // Seasonal shift prediction
 export function getSeasonalShift(month) {
     const shifts = {
@@ -250,3 +314,4 @@ export function getSeasonalShift(month) {
     };
     return shifts[month] || shifts[0];
 }
+

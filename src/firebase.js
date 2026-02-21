@@ -88,6 +88,11 @@ export async function updateUserProfile(uid, data) {
     await updateDoc(ref, data);
 }
 
+// ─── Birth Data ───
+export async function saveBirthData(uid, birthData) {
+    await updateDoc(doc(db, 'users', uid), { birthData });
+}
+
 // ─── Cycle Data ───
 export async function saveCycleData(uid, cycleData) {
     await updateDoc(doc(db, 'users', uid), {
@@ -120,6 +125,22 @@ export async function getDailyLog(uid, date) {
 export async function getDailyLogs(uid, limit = 30) {
     const ref = collection(db, 'users', uid, 'dailyLogs');
     const q = query(ref, orderBy('date', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() })).slice(0, limit);
+}
+
+// ─── Period Logs ───
+export async function savePeriodLog(uid, periodLog) {
+    const ref = doc(db, 'users', uid, 'periodLogs', periodLog.startDate);
+    await setDoc(ref, {
+        ...periodLog,
+        updatedAt: serverTimestamp(),
+    }, { merge: true });
+}
+
+export async function getPeriodLogs(uid, limit = 24) {
+    const ref = collection(db, 'users', uid, 'periodLogs');
+    const q = query(ref, orderBy('startDate', 'desc'));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() })).slice(0, limit);
 }

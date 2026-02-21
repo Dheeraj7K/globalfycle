@@ -1,5 +1,22 @@
 import React, { useState, useEffect } from 'react';
 
+function Tooltip({ text, children }) {
+    const [show, setShow] = useState(false);
+    return (
+        <div style={{ position: 'relative', display: 'inline-block' }}
+            onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}
+            onClick={() => setShow(s => !s)}>
+            {children}
+            {show && (
+                <div className="ob-tooltip">
+                    <div className="ob-tooltip-arrow" />
+                    {text}
+                </div>
+            )}
+        </div>
+    );
+}
+
 const STEPS = [
     {
         id: 'welcome',
@@ -7,6 +24,20 @@ const STEPS = [
         title: 'Welcome to Global Fycle',
         subtitle: 'The world\'s first cosmic period synchronization platform',
         description: 'Connect with your body, the moon, and women across the planet.',
+    },
+    {
+        id: 'about',
+        emoji: '✨',
+        title: 'Tell us about you',
+        subtitle: 'Your identity in the cosmic sisterhood',
+        type: 'about',
+    },
+    {
+        id: 'birth',
+        emoji: '🌟',
+        title: 'When & where were you born?',
+        subtitle: 'This helps us calculate your personal birth chart',
+        type: 'birth',
     },
     {
         id: 'period',
@@ -57,7 +88,7 @@ const STEPS = [
         id: 'ready',
         emoji: '🎆',
         title: 'Your cosmic profile is ready',
-        subtitle: 'You\'re about to join 3,000+ women synced across 43 countries',
+        subtitle: 'Welcome to the global sisterhood',
         type: 'reveal',
     },
 ];
@@ -84,14 +115,64 @@ export default function Onboarding({ onComplete, moonData }) {
         cycleLength: 28,
         periodLength: 5,
     });
+    const [birthData, setBirthData] = useState({
+        name: '',
+        dob: '',
+        birthTime: '',
+        birthTimeUnknown: false,
+        birthPlace: '',
+    });
     const [interests, setInterests] = useState([]);
     const [animating, setAnimating] = useState(false);
     const [particles, setParticles] = useState([]);
 
     const current = STEPS[step];
 
+    // Calculate age from DOB
+    const calcAge = (dob) => {
+        if (!dob) return null;
+        const born = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - born.getFullYear();
+        const m = today.getMonth() - born.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < born.getDate())) age--;
+        return age;
+    };
+
+    const age = calcAge(birthData.dob);
+
+    // Get zodiac sign from DOB (preview)
+    const getSignFromDOB = (dob) => {
+        if (!dob) return null;
+        const d = new Date(dob);
+        const month = d.getMonth() + 1;
+        const day = d.getDate();
+        const signs = [
+            { sign: 'Capricorn', emoji: '♑', start: [1, 1], end: [1, 19] },
+            { sign: 'Aquarius', emoji: '♒', start: [1, 20], end: [2, 18] },
+            { sign: 'Pisces', emoji: '♓', start: [2, 19], end: [3, 20] },
+            { sign: 'Aries', emoji: '♈', start: [3, 21], end: [4, 19] },
+            { sign: 'Taurus', emoji: '♉', start: [4, 20], end: [5, 20] },
+            { sign: 'Gemini', emoji: '♊', start: [5, 21], end: [6, 20] },
+            { sign: 'Cancer', emoji: '♋', start: [6, 21], end: [7, 22] },
+            { sign: 'Leo', emoji: '♌', start: [7, 23], end: [8, 22] },
+            { sign: 'Virgo', emoji: '♍', start: [8, 23], end: [9, 22] },
+            { sign: 'Libra', emoji: '♎', start: [9, 23], end: [10, 22] },
+            { sign: 'Scorpio', emoji: '♏', start: [10, 23], end: [11, 21] },
+            { sign: 'Sagittarius', emoji: '♐', start: [11, 22], end: [12, 21] },
+            { sign: 'Capricorn', emoji: '♑', start: [12, 22], end: [12, 31] },
+        ];
+        for (const s of signs) {
+            const [sm, sd] = s.start;
+            const [em, ed] = s.end;
+            if ((month === sm && day >= sd) || (month === em && day <= ed)) return s;
+        }
+        return signs[0];
+    };
+
+    const sunSign = getSignFromDOB(birthData.dob);
+
     useEffect(() => {
-        // Spawn confetti particles on the reveal step
         if (current.id === 'ready') {
             const p = Array.from({ length: 30 }, (_, i) => ({
                 id: i,
@@ -107,7 +188,7 @@ export default function Onboarding({ onComplete, moonData }) {
 
     const goNext = () => {
         if (step >= STEPS.length - 1) {
-            onComplete(data);
+            onComplete({ ...data, birthData });
             return;
         }
         setAnimating(true);
@@ -128,6 +209,12 @@ export default function Onboarding({ onComplete, moonData }) {
 
     const toggleInterest = (id) => {
         setInterests(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const canProceed = () => {
+        if (current.id === 'about') return birthData.name.trim().length >= 1 && birthData.dob;
+        if (current.id === 'birth') return true; // birth time and place are optional
+        return true;
     };
 
     return (
@@ -166,6 +253,96 @@ export default function Onboarding({ onComplete, moonData }) {
                     <div className="ob-emoji">{current.emoji}</div>
                     <h1 className="ob-title">{current.title}</h1>
                     <p className="ob-subtitle">{current.subtitle}</p>
+
+                    {/* About You step */}
+                    {current.type === 'about' && (
+                        <div className="ob-input-group" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            <div>
+                                <div className="ob-field-header">
+                                    <label className="ob-field-label">Your Name</label>
+                                    <Tooltip text="This is what we'll call you! Like your superpower name ✨">
+                                        <span className="ob-help-icon">?</span>
+                                    </Tooltip>
+                                </div>
+                                <input
+                                    type="text"
+                                    className="ob-text-input"
+                                    placeholder="Enter your name"
+                                    value={birthData.name}
+                                    onChange={e => setBirthData(d => ({ ...d, name: e.target.value }))}
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <div className="ob-field-header">
+                                    <label className="ob-field-label">Date of Birth</label>
+                                    <Tooltip text="The day you were born! The stars and moon were in a special place just for you 🌟">
+                                        <span className="ob-help-icon">?</span>
+                                    </Tooltip>
+                                </div>
+                                <input
+                                    type="date"
+                                    className="ob-date-input"
+                                    value={birthData.dob}
+                                    onChange={e => setBirthData(d => ({ ...d, dob: e.target.value }))}
+                                />
+                                {birthData.dob && (
+                                    <div className="ob-dob-preview">
+                                        <span className="ob-age-badge">{age} years old</span>
+                                        {sunSign && <span className="ob-sign-badge">{sunSign.emoji} {sunSign.sign}</span>}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Birth Details step */}
+                    {current.type === 'birth' && (
+                        <div className="ob-input-group" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            <div>
+                                <div className="ob-field-header">
+                                    <label className="ob-field-label">Birth Time</label>
+                                    <Tooltip text="What time you were born tells us which stars were rising in the sky when you took your first breath 🌅">
+                                        <span className="ob-help-icon">?</span>
+                                    </Tooltip>
+                                </div>
+                                {!birthData.birthTimeUnknown ? (
+                                    <input
+                                        type="time"
+                                        className="ob-date-input"
+                                        value={birthData.birthTime}
+                                        onChange={e => setBirthData(d => ({ ...d, birthTime: e.target.value }))}
+                                    />
+                                ) : (
+                                    <div className="ob-unknown-msg">That's okay! We'll calculate what we can without it 💫</div>
+                                )}
+                                <button
+                                    className={`ob-toggle-btn ${birthData.birthTimeUnknown ? 'active' : ''}`}
+                                    onClick={() => setBirthData(d => ({ ...d, birthTimeUnknown: !d.birthTimeUnknown, birthTime: '' }))}
+                                >
+                                    {birthData.birthTimeUnknown ? '✓ ' : ''}I don't know my birth time
+                                </button>
+                            </div>
+                            <div>
+                                <div className="ob-field-header">
+                                    <label className="ob-field-label">Birth Place</label>
+                                    <Tooltip text="Where you were born matters because the sky looks different from different places on Earth 🌍">
+                                        <span className="ob-help-icon">?</span>
+                                    </Tooltip>
+                                </div>
+                                <input
+                                    type="text"
+                                    className="ob-text-input"
+                                    placeholder="City, Country (e.g. Mumbai, India)"
+                                    value={birthData.birthPlace}
+                                    onChange={e => setBirthData(d => ({ ...d, birthPlace: e.target.value }))}
+                                />
+                                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
+                                    Optional — helps calculate your rising sign more precisely
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Date input */}
                     {current.type === 'date' && (
@@ -226,15 +403,20 @@ export default function Onboarding({ onComplete, moonData }) {
                                 </div>
                                 <div className="ob-reveal-divider" />
                                 <div className="ob-reveal-stat">
-                                    <span className="ob-reveal-num">{moonData?.phaseName || 'Waxing'}</span>
-                                    <span className="ob-reveal-label">current moon</span>
+                                    <span className="ob-reveal-num">{sunSign ? sunSign.emoji : '🌙'}</span>
+                                    <span className="ob-reveal-label">{sunSign ? sunSign.sign : 'your sign'}</span>
                                 </div>
                                 <div className="ob-reveal-divider" />
                                 <div className="ob-reveal-stat">
-                                    <span className="ob-reveal-num">3,000+</span>
-                                    <span className="ob-reveal-label">sisters synced</span>
+                                    <span className="ob-reveal-num">{moonData?.phaseName || 'Waxing'}</span>
+                                    <span className="ob-reveal-label">current moon</span>
                                 </div>
                             </div>
+                            {birthData.name && (
+                                <div style={{ marginTop: 16, fontSize: '1rem', color: 'rgba(255,255,255,0.7)' }}>
+                                    Welcome, <span style={{ color: '#ffd700', fontWeight: 600 }}>{birthData.name}</span> ✨
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -249,7 +431,8 @@ export default function Onboarding({ onComplete, moonData }) {
                     {step > 0 && (
                         <button className="ob-back" onClick={goBack}>← Back</button>
                     )}
-                    <button className="ob-next" onClick={goNext}>
+                    <button className="ob-next" onClick={goNext} disabled={!canProceed()}
+                        style={{ opacity: canProceed() ? 1 : 0.5 }}>
                         {step === 0 ? 'Get Started' : step >= STEPS.length - 1 ? 'Enter Global Fycle ✨' : 'Continue'}
                     </button>
                 </div>

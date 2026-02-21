@@ -2,8 +2,20 @@ import React, { useState } from 'react';
 import { useApp } from '../App';
 
 export default function Profile() {
-    const { user, cycleData, setCycleData, cycleInfo, zodiac, moonData, noosphere } = useApp();
+    const { user, cycleData, setCycleData, cycleInfo, zodiac, moonData, noosphere, birthData, natalChart, logHistory, periodLogs } = useApp();
     const [notifications, setNotifications] = useState({ period: true, ovulation: true, moon: true, community: false, ai: true });
+
+    const calcAge = (dob) => {
+        if (!dob) return null;
+        const born = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - born.getFullYear();
+        const m = today.getMonth() - born.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < born.getDate())) age--;
+        return age;
+    };
+
+    const age = birthData?.dob ? calcAge(birthData.dob) : null;
 
     return (
         <div className="animate-fadeIn">
@@ -14,43 +26,77 @@ export default function Profile() {
                 {/* Profile Card */}
                 <div className="glass-card">
                     <div className="profile-header">
-                        <div className="profile-avatar">🌙</div>
+                        <div className="profile-avatar">
+                            {user?.avatar && user.avatar !== '🌙'
+                                ? <img src={user.avatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                : '🌙'}
+                        </div>
                         <div className="profile-info">
-                            <h2>Cosmic Goddess</h2>
-                            <p>Connected via {user?.provider || 'Email'} • Member since Feb 2026</p>
-                            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                                <span className="pill pill-magenta">{zodiac.emoji} {zodiac.sign}</span>
-                                <span className="pill pill-gold">{moonData.emoji} {moonData.phaseName}</span>
-                                <span className="pill pill-teal">🧠 Noosphere {noosphere.index}</span>
+                            <h2>{birthData?.name || user?.name || 'Cosmic Soul'}</h2>
+                            <p>
+                                {age ? `${age} years old • ` : ''}
+                                {user?.provider || 'Email'} • Member since {
+                                    user?.joinDate ? new Date(user.joinDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Recently'
+                                }
+                            </p>
+                            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                                {natalChart ? (
+                                    <>
+                                        <span className="pill pill-gold">{natalChart.sunSign.emoji} Sun: {natalChart.sunSign.sign}</span>
+                                        <span className="pill pill-purple">{natalChart.moonSign.emoji} Moon: {natalChart.moonSign.sign}</span>
+                                        {natalChart.risingSign && (
+                                            <span className="pill pill-teal">{natalChart.risingSign.emoji} Rising: {natalChart.risingSign.sign}</span>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="pill pill-magenta">{zodiac.emoji} {zodiac.sign}</span>
+                                        <span className="pill pill-gold">{moonData.emoji} {moonData.phaseName}</span>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Connected Accounts */}
-                    <div className="settings-group">
-                        <h4>Connected Accounts</h4>
-                        {[
-                            { name: 'Apple', icon: '🍎', connected: user?.provider === 'apple' },
-                            { name: 'Google', icon: '🔵', connected: user?.provider === 'google' },
-                            { name: 'Pinterest', icon: '📌', connected: user?.provider === 'pinterest' },
-                        ].map(a => (
-                            <div key={a.name} className="setting-row">
-                                <div>
-                                    <div className="setting-label">{a.icon} {a.name}</div>
-                                    <div className="setting-desc">{a.connected ? 'Connected' : 'Not connected'}</div>
+                    {/* Natal Chart Details */}
+                    {natalChart && (
+                        <div style={{ marginTop: 16 }}>
+                            <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Birth Chart</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                                <div className="glass-card" style={{ padding: 12 }}>
+                                    <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Dominant Element</div>
+                                    <div style={{ fontSize: '1rem', color: '#ffd700', marginTop: 4 }}>
+                                        {natalChart.dominantElement === 'Fire' ? '🔥' : natalChart.dominantElement === 'Water' ? '💧' : natalChart.dominantElement === 'Earth' ? '🌍' : '💨'} {natalChart.dominantElement}
+                                    </div>
                                 </div>
-                                <button className="btn btn-ghost btn-sm">{a.connected ? '✓ Connected' : 'Connect'}</button>
+                                <div className="glass-card" style={{ padding: 12 }}>
+                                    <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Modality</div>
+                                    <div style={{ fontSize: '1rem', color: '#a855f7', marginTop: 4 }}>{natalChart.dominantModality}</div>
+                                </div>
+                                <div className="glass-card" style={{ padding: 12 }}>
+                                    <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Sun Ruler</div>
+                                    <div style={{ fontSize: '0.85rem', color: '#00f5d4', marginTop: 4 }}>{natalChart.sunSign.ruler}</div>
+                                </div>
+                                <div className="glass-card" style={{ padding: 12 }}>
+                                    <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Moon Ruler</div>
+                                    <div style={{ fontSize: '0.85rem', color: '#ff5c9e', marginTop: 4 }}>{natalChart.moonSign.ruler}</div>
+                                </div>
                             </div>
-                        ))}
-                    </div>
+                            {birthData?.birthPlace && (
+                                <div style={{ marginTop: 8, fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)' }}>
+                                    📍 Born in {birthData.birthPlace}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
-                    {/* Stats */}
+                    {/* Stats from real data */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginTop: 16 }}>
                         {[
-                            { label: 'Cycles Tracked', value: '12', color: '#ff2d78' },
-                            { label: 'Days Logged', value: '287', color: '#00f5d4' },
-                            { label: 'Communities', value: '4', color: '#a855f7' },
-                            { label: 'Spiritual Level', value: 'Intuitive', color: '#ffd700' },
+                            { label: 'Periods Logged', value: periodLogs?.length || '—', color: '#ff2d78' },
+                            { label: 'Days Logged', value: logHistory?.length || '—', color: '#00f5d4' },
+                            { label: 'Current Phase', value: cycleInfo.phaseName, color: '#a855f7' },
+                            { label: 'Noosphere', value: noosphere.index, color: '#ffd700' },
                         ].map((s, i) => (
                             <div key={i} className="glass-card" style={{ padding: 14, textAlign: 'center' }}>
                                 <div style={{ fontSize: '1.3rem', fontWeight: 700, color: s.color }}>{s.value}</div>

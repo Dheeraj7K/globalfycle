@@ -32,7 +32,12 @@ export default function Profile() {
                                 : '🌙'}
                         </div>
                         <div className="profile-info">
-                            <h2>{birthData?.name || user?.name || 'Cosmic Soul'}</h2>
+                            <h2>{user?.name || 'Cosmic Soul'}</h2>
+                            {user?.realName && (
+                                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>
+                                    🔒 Private name: {user.realName}
+                                </div>
+                            )}
                             <p>
                                 {age ? `${age} years old • ` : ''}
                                 {user?.provider || 'Email'} • Member since {
@@ -165,15 +170,15 @@ export default function Profile() {
                             <h4>Privacy & Anonymity</h4>
                             <div className="setting-row">
                                 <div>
-                                    <div className="setting-label">Global Map Visibility</div>
-                                    <div className="setting-desc">Show as anonymous dot on global sync map</div>
+                                    <div className="setting-label">Your Cosmic Name</div>
+                                    <div className="setting-desc" style={{ color: '#ffd700', fontWeight: 600, fontSize: '0.8rem' }}>✦ {user?.name} ✦</div>
+                                    <div className="setting-desc">This is how others see you in chats & on the map</div>
                                 </div>
-                                <div className="toggle active" />
                             </div>
                             <div className="setting-row">
                                 <div>
-                                    <div className="setting-label">Anonymous Chat Name</div>
-                                    <div className="setting-desc">Use cosmic name instead of real name</div>
+                                    <div className="setting-label">Global Map Visibility</div>
+                                    <div className="setting-desc">Show as anonymous dot on global sync map</div>
                                 </div>
                                 <div className="toggle active" />
                             </div>

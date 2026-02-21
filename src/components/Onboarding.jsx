@@ -1,12 +1,57 @@
 import React, { useState, useEffect } from 'react';
 
-function Tooltip({ text, children }) {
+// ─── Cosmic Goddess Name Generator ───
+const COSMIC_ADJECTIVES = [
+    'Luminous', 'Celestial', 'Ethereal', 'Radiant', 'Mystic',
+    'Silver', 'Golden', 'Crimson', 'Violet', 'Obsidian',
+    'Starborn', 'Moonlit', 'Eclipse', 'Aurora', 'Nebula',
+    'Sacred', 'Crystal', 'Shadow', 'Ember', 'Prism',
+    'Midnight', 'Twilight', 'Dawn', 'Solstice', 'Equinox',
+    'Ivory', 'Sapphire', 'Opal', 'Jade', 'Ruby',
+];
+const COSMIC_NOUNS = [
+    'Phoenix', 'Selene', 'Luna', 'Aria', 'Nova',
+    'Stella', 'Lyra', 'Iris', 'Freya', 'Gaia',
+    'Athena', 'Diana', 'Flora', 'Nyx', 'Rhea',
+    'Circe', 'Vesta', 'Juno', 'Ceres', 'Aurora',
+    'Muse', 'Sphinx', 'Oracle', 'Siren', 'Valkyrie',
+    'Priestess', 'Sorceress', 'Dreamer', 'Wanderer', 'Weaver',
+];
+
+export function generateCosmicName(seed) {
+    // Deterministic from seed (e.g. user UID) so it stays consistent
+    let hash = 0;
+    const s = String(seed || Math.random());
+    for (let i = 0; i < s.length; i++) {
+        hash = ((hash << 5) - hash) + s.charCodeAt(i);
+        hash |= 0;
+    }
+    const adj = COSMIC_ADJECTIVES[Math.abs(hash) % COSMIC_ADJECTIVES.length];
+    const noun = COSMIC_NOUNS[Math.abs(hash >> 8) % COSMIC_NOUNS.length];
+    return `${adj} ${noun}`;
+}
+
+// ─── Info Tooltip (tap-friendly) ───
+function InfoTip({ text }) {
     const [show, setShow] = useState(false);
+
+    useEffect(() => {
+        if (!show) return;
+        const handleOutside = (e) => {
+            if (!e.target.closest('.ob-info-wrap')) setShow(false);
+        };
+        document.addEventListener('click', handleOutside);
+        return () => document.removeEventListener('click', handleOutside);
+    }, [show]);
+
     return (
-        <div style={{ position: 'relative', display: 'inline-block' }}
-            onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}
-            onClick={() => setShow(s => !s)}>
-            {children}
+        <div className="ob-info-wrap" style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+                className="ob-info-icon"
+                onClick={(e) => { e.stopPropagation(); setShow(s => !s); }}
+                aria-label="Info"
+                type="button"
+            >ℹ</button>
             {show && (
                 <div className="ob-tooltip">
                     <div className="ob-tooltip-arrow" />
@@ -171,6 +216,7 @@ export default function Onboarding({ onComplete, moonData }) {
     };
 
     const sunSign = getSignFromDOB(birthData.dob);
+    const cosmicName = generateCosmicName(birthData.name + birthData.dob);
 
     useEffect(() => {
         if (current.id === 'ready') {
@@ -188,7 +234,7 @@ export default function Onboarding({ onComplete, moonData }) {
 
     const goNext = () => {
         if (step >= STEPS.length - 1) {
-            onComplete({ ...data, birthData });
+            onComplete({ ...data, birthData: { ...birthData, cosmicName } });
             return;
         }
         setAnimating(true);
@@ -213,7 +259,7 @@ export default function Onboarding({ onComplete, moonData }) {
 
     const canProceed = () => {
         if (current.id === 'about') return birthData.name.trim().length >= 1 && birthData.dob;
-        if (current.id === 'birth') return true; // birth time and place are optional
+        if (current.id === 'birth') return true;
         return true;
     };
 
@@ -260,9 +306,7 @@ export default function Onboarding({ onComplete, moonData }) {
                             <div>
                                 <div className="ob-field-header">
                                     <label className="ob-field-label">Your Name</label>
-                                    <Tooltip text="This is what we'll call you! Like your superpower name ✨">
-                                        <span className="ob-help-icon">?</span>
-                                    </Tooltip>
+                                    <InfoTip text="This is just for us to know who you are! Nobody else sees it — we give you a magical secret name instead 🦄" />
                                 </div>
                                 <input
                                     type="text"
@@ -276,9 +320,7 @@ export default function Onboarding({ onComplete, moonData }) {
                             <div>
                                 <div className="ob-field-header">
                                     <label className="ob-field-label">Date of Birth</label>
-                                    <Tooltip text="The day you were born! The stars and moon were in a special place just for you 🌟">
-                                        <span className="ob-help-icon">?</span>
-                                    </Tooltip>
+                                    <InfoTip text="When you were born, all the stars and planets were in special spots in the sky — like a fingerprint but made of stars! We use this to find YOUR special star pattern ⭐" />
                                 </div>
                                 <input
                                     type="date"
@@ -302,9 +344,7 @@ export default function Onboarding({ onComplete, moonData }) {
                             <div>
                                 <div className="ob-field-header">
                                     <label className="ob-field-label">Birth Time</label>
-                                    <Tooltip text="What time you were born tells us which stars were rising in the sky when you took your first breath 🌅">
-                                        <span className="ob-help-icon">?</span>
-                                    </Tooltip>
+                                    <InfoTip text="Imagine the sky is a big clock 🕐 — the exact time you were born tells us which stars were peeking over the horizon to say hello to baby you! This gives you your 'rising sign'" />
                                 </div>
                                 {!birthData.birthTimeUnknown ? (
                                     <input
@@ -326,16 +366,15 @@ export default function Onboarding({ onComplete, moonData }) {
                             <div>
                                 <div className="ob-field-header">
                                     <label className="ob-field-label">Birth Place</label>
-                                    <Tooltip text="Where you were born matters because the sky looks different from different places on Earth 🌍">
-                                        <span className="ob-help-icon">?</span>
-                                    </Tooltip>
+                                    <InfoTip text="If you stand in India and look up, you see different stars than someone in Brazil! 🌍 Where you were born changes which stars were above you — so it changes your star map!" />
                                 </div>
                                 <input
                                     type="text"
                                     className="ob-text-input"
-                                    placeholder="City, Country (e.g. Mumbai, India)"
+                                    placeholder="Type your city, e.g. Mumbai"
                                     value={birthData.birthPlace}
                                     onChange={e => setBirthData(d => ({ ...d, birthPlace: e.target.value }))}
+                                    autoComplete="off"
                                 />
                                 <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
                                     Optional — helps calculate your rising sign more precisely
@@ -412,11 +451,13 @@ export default function Onboarding({ onComplete, moonData }) {
                                     <span className="ob-reveal-label">current moon</span>
                                 </div>
                             </div>
-                            {birthData.name && (
-                                <div style={{ marginTop: 16, fontSize: '1rem', color: 'rgba(255,255,255,0.7)' }}>
-                                    Welcome, <span style={{ color: '#ffd700', fontWeight: 600 }}>{birthData.name}</span> ✨
+                            <div style={{ marginTop: 20, padding: '12px 20px', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.25)', borderRadius: 16 }}>
+                                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Your cosmic goddess name</div>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffd700' }}>✦ {cosmicName} ✦</div>
+                                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                                    This is how you appear in the sisterhood
                                 </div>
-                            )}
+                            </div>
                         </div>
                     )}
 

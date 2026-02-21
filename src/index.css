@@ -2009,25 +2009,38 @@ select.input-field {
   font-weight: 600;
 }
 
-.ob-help-icon {
-  width: 20px;
-  height: 20px;
+.ob-info-icon {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: rgba(255, 215, 0, 0.15);
-  border: 1px solid rgba(255, 215, 0, 0.3);
-  color: #ffd700;
-  font-size: 0.65rem;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1.5px solid rgba(168, 85, 247, 0.4);
+  color: #a855f7;
+  font-size: 0.75rem;
   font-weight: 700;
-  display: flex;
+  font-style: normal;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.ob-help-icon:hover {
-  background: rgba(255, 215, 0, 0.25);
-  transform: scale(1.1);
+.ob-info-icon:active {
+  background: rgba(168, 85, 247, 0.35);
+  transform: scale(0.92);
+}
+
+@media (hover: hover) {
+  .ob-info-icon:hover {
+    background: rgba(168, 85, 247, 0.3);
+    transform: scale(1.1);
+    border-color: rgba(168, 85, 247, 0.6);
+  }
 }
 
 /* Tooltip */

@@ -10,7 +10,7 @@ import SpiritualEvolution from './components/SpiritualEvolution';
 import MoonCalendar from './components/MoonCalendar';
 import Profile from './components/Profile';
 import Login from './components/Login';
-import Onboarding from './components/Onboarding';
+import Onboarding, { generateCosmicName } from './components/Onboarding';
 import DailyBriefing from './components/DailyBriefing';
 import { DEFAULT_CYCLE, getCycleInfo } from './utils/cycleEngine';
 import { getMoonPhase, getZodiacSign, getNoosphereIndex, getNatalChart } from './utils/cosmicEngine';
@@ -197,8 +197,10 @@ export default function App() {
         }, 200);
     };
 
+    const cosmicName = birthData?.cosmicName || generateCosmicName(firebaseUser?.uid);
     const user = firebaseUser ? {
-        name: birthData?.name || firebaseUser.displayName || userProfile?.displayName || 'Cosmic Soul',
+        name: cosmicName,
+        realName: birthData?.name || null,
         email: firebaseUser.email,
         avatar: firebaseUser.photoURL || '🌙',
         provider: firebaseUser.providerData?.[0]?.providerId || 'email',

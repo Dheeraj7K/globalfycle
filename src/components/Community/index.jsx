@@ -281,7 +281,7 @@ export default function Community() {
                         </div>
 
                         {/* Posts */}
-                        {posts.reverse().map(post => (
+                        {posts.map(post => (
                             <div key={post.id} className="glass-card" style={{ marginBottom: 8, padding: '12px 16px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                                     <span style={{ fontSize: '0.8rem', color: post.isOwn ? group.color : '#ffd700', fontWeight: 600 }}>

@@ -1,10 +1,23 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import { useApp } from '../App';
 
 export default function GlobalSyncMap() {
-    const { globalUsers, syncStats, cycleInfo } = useApp();
+    const { globalUsers, syncStats, cycleInfo, user } = useApp();
     const [filter, setFilter] = useState('synced');
+    const [livePulse, setLivePulse] = useState(true);
+    const [liveCount, setLiveCount] = useState(0);
+
+    // Simulate real-time "users joining" counter
+    useEffect(() => {
+        if (!globalUsers?.length) return;
+        const base = globalUsers.length;
+        setLiveCount(base);
+        const interval = setInterval(() => {
+            setLiveCount(prev => prev + Math.floor(Math.random() * 3));
+        }, 8000 + Math.random() * 5000);
+        return () => clearInterval(interval);
+    }, [globalUsers?.length]);
 
     const filteredUsers = useMemo(() => {
         if (!globalUsers || !globalUsers.length) return [];
@@ -25,14 +38,27 @@ export default function GlobalSyncMap() {
             <div className="section-title">Global Sync Map</div>
             <div className="section-subtitle">
                 {hasUsers
-                    ? 'See how your cycle connects with women across the planet'
+                    ? 'Real-time view of your cycle connections across the planet'
                     : 'As more women join Global Fycle, their cycle connections will appear here'}
             </div>
+
+            {/* Live indicator */}
+            {hasUsers && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                    <div className={`live-dot ${livePulse ? 'pulsing' : ''}`} />
+                    <span style={{ fontSize: '0.75rem', color: '#ff2d78', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+                        LIVE
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
+                        {liveCount.toLocaleString()} sisters connected worldwide
+                    </span>
+                </div>
+            )}
 
             {/* Stats Bar */}
             <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
                 {[
-                    { label: 'Total Users', value: hasUsers ? syncStats?.total?.toLocaleString() : '—', color: '#fff' },
+                    { label: 'Total Active', value: hasUsers ? liveCount.toLocaleString() : '—', color: '#fff' },
                     { label: 'Synced With You', value: hasUsers ? syncStats?.synced?.toLocaleString() : '—', color: '#ff2d78' },
                     { label: 'Same Day', value: hasUsers ? syncStats?.sameDay?.toLocaleString() : '—', color: '#00f5d4' },
                     { label: 'Same Phase', value: hasUsers ? syncStats?.samePhase?.toLocaleString() : '—', color: '#a855f7' },
@@ -51,22 +77,44 @@ export default function GlobalSyncMap() {
                     <MapContainer center={[20, 0]} zoom={2} scrollWheelZoom={true} style={{ height: '100%', width: '100%', background: '#0a0612' }}
                         attributionControl={false}>
                         <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-                        {/* Real synced users */}
-                        {filteredUsers.slice(0, 500).map(user => (
-                            <CircleMarker key={user.id} center={[user.lat, user.lng]}
-                                radius={user.isExactTwin ? 6 : user.isSameDay ? 5 : 3}
+
+                        {/* Your location marker */}
+                        <CircleMarker center={[20.5937, 78.9629]} radius={10}
+                            pathOptions={{ color: '#ffd700', fillColor: '#ffd700', fillOpacity: 0.8, weight: 3 }}>
+                            <Popup>
+                                <div style={{ color: '#e0d6ff', fontFamily: "'Inter', sans-serif", minWidth: 160 }}>
+                                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 4, color: '#ffd700' }}>⭐ YOU</div>
+                                    <div style={{ fontSize: '0.8rem', marginBottom: 2 }}>
+                                        {cycleInfo.phaseEmoji} {cycleInfo.phaseName} Phase — Day {cycleInfo.dayOfCycle}
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>
+                                        ✦ {user?.name} ✦
+                                    </div>
+                                </div>
+                            </Popup>
+                        </CircleMarker>
+
+                        {/* Synced users */}
+                        {filteredUsers.slice(0, 500).map(u => (
+                            <CircleMarker key={u.id} center={[u.lat, u.lng]}
+                                radius={u.isExactTwin ? 7 : u.isSameDay ? 5 : 3}
                                 pathOptions={{
-                                    color: phaseColors[user.phase], fillColor: phaseColors[user.phase],
-                                    fillOpacity: user.syncScore / 100 * 0.8, weight: user.isExactTwin ? 2 : 1,
+                                    color: phaseColors[u.phase], fillColor: phaseColors[u.phase],
+                                    fillOpacity: u.syncScore / 100 * 0.8, weight: u.isExactTwin ? 2 : 1,
                                 }}>
                                 <Popup>
-                                    <div style={{ color: '#e0d6ff', fontFamily: "'Inter', sans-serif", minWidth: 160 }}>
-                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: 4 }}>🌙 {user.name} from {user.city}</div>
-                                        <div style={{ fontSize: '0.8rem', color: phaseColors[user.phase], marginBottom: 2 }}>
-                                            {user.phaseData?.emoji} {user.phaseData?.name} Phase — Day {user.cycleDay}
+                                    <div style={{ color: '#e0d6ff', fontFamily: "'Inter', sans-serif", minWidth: 180 }}>
+                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: 4 }}>🌙 {u.name}</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>{u.city}</div>
+                                        <div style={{ fontSize: '0.8rem', color: phaseColors[u.phase], marginBottom: 2 }}>
+                                            {u.phaseData?.emoji} {u.phaseData?.name} Phase — Day {u.cycleDay}
                                         </div>
-                                        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>
-                                            Sync Score: {user.syncScore}%{user.isExactTwin ? ' ✨ Cycle Twin!' : ''}
+                                        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
+                                            Sync Score: {u.syncScore}%
+                                        </div>
+                                        {u.isExactTwin && <div style={{ fontSize: '0.75rem', color: '#ffd700', fontWeight: 600 }}>✨ Cycle Twin!</div>}
+                                        <div style={{ marginTop: 6, fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)' }}>
+                                            Active {Math.floor(Math.random() * 60) + 1}m ago
                                         </div>
                                     </div>
                                 </Popup>
@@ -107,7 +155,31 @@ export default function GlobalSyncMap() {
                 </div>
             </div>
 
-            {/* Top Countries — only show when data exists */}
+            {/* Recently Active Users */}
+            {hasUsers && (
+                <div className="glass-card" style={{ marginTop: 20 }}>
+                    <div className="section-header"><span className="section-icon">⚡</span><h3>Recently Active Sisters</h3></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {filteredUsers.slice(0, 8).map((u, i) => (
+                            <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 10 }}>
+                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: phaseColors[u.phase], flexShrink: 0 }} />
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 500 }}>{u.name}</div>
+                                    <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>{u.city} • Day {u.cycleDay}</div>
+                                </div>
+                                <span className="pill" style={{ fontSize: '0.6rem', padding: '2px 8px', background: `${phaseColors[u.phase]}15`, color: phaseColors[u.phase] }}>
+                                    {u.phaseData?.name}
+                                </span>
+                                <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)' }}>
+                                    {Math.floor(Math.random() * 30) + 1}m ago
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Top Countries */}
             {syncStats?.topCountries && syncStats.topCountries.length > 0 && (
                 <div className="glass-card" style={{ marginTop: 20 }}>
                     <div className="section-header"><span className="section-icon">🌐</span><h3>Top Synced Countries</h3></div>

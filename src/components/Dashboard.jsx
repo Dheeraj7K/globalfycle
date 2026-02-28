@@ -1,8 +1,176 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../App';
 
+// ─── Detail Modal ───
+function DetailModal({ title, children, onClose }) {
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content detail-modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2 style={{ color: '#fff', fontSize: '1.2rem' }}>{title}</h2>
+                    <button className="modal-close" onClick={onClose}>✕</button>
+                </div>
+                <div className="modal-body">{children}</div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Period Detail Page ───
+function PeriodDetail({ cycleInfo, moonData }) {
+    return (
+        <>
+            <div className="detail-hero" style={{ background: 'linear-gradient(135deg, rgba(255,45,120,0.15), rgba(168,85,247,0.1))' }}>
+                <div style={{ fontSize: '3rem' }}>{cycleInfo.phaseEmoji}</div>
+                <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#ff2d78' }}>{cycleInfo.daysUntilNextPeriod}</div>
+                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>days until your next period</div>
+            </div>
+            <div className="detail-grid">
+                <div className="detail-item">
+                    <div className="detail-item-label">Current Phase</div>
+                    <div className="detail-item-value" style={{ color: cycleInfo.phaseColor }}>{cycleInfo.phaseEmoji} {cycleInfo.phaseName}</div>
+                </div>
+                <div className="detail-item">
+                    <div className="detail-item-label">Cycle Day</div>
+                    <div className="detail-item-value">{cycleInfo.dayOfCycle} / {cycleInfo.totalDays}</div>
+                </div>
+                <div className="detail-item">
+                    <div className="detail-item-label">Period Length</div>
+                    <div className="detail-item-value">{cycleInfo.periodLength} days</div>
+                </div>
+                <div className="detail-item">
+                    <div className="detail-item-label">Fertility Window</div>
+                    <div className="detail-item-value" style={{ color: '#ffd700' }}>{cycleInfo.fertilityStatus || 'Low'}</div>
+                </div>
+            </div>
+            <div className="detail-section">
+                <h4>🌀 What's happening in your body</h4>
+                <p>{cycleInfo.phase === 'menstrual'
+                    ? 'Your uterine lining is shedding. Hormone levels (estrogen & progesterone) are at their lowest. Your body is in rest-and-release mode. Honor this time with gentle movement and warm foods.'
+                    : cycleInfo.phase === 'follicular'
+                        ? 'Estrogen is rising! Your body is building up energy. Follicles in your ovaries are maturing. This is your "spring" — creativity and confidence are growing. Great time for new projects.'
+                        : cycleInfo.phase === 'ovulation'
+                            ? 'Estrogen peaks and triggers a surge of luteinizing hormone (LH), releasing an egg. You\'re at peak fertility, energy, and social magnetism. Your voice even changes to be more attractive!'
+                            : 'Progesterone rises to prepare the uterine lining. If no pregnancy occurs, hormone levels will drop, triggering your next period. Energy turns inward — perfect for completing tasks and nesting.'
+                }</p>
+            </div>
+            <div className="detail-section">
+                <h4>🧘 Phase Recommendations</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {cycleInfo.movementMedicine?.map((m, i) => <span key={i} className="pill pill-magenta">{m}</span>)}
+                    {cycleInfo.herbs?.map((h, i) => <span key={i} className="pill pill-gold">{h}</span>)}
+                    {cycleInfo.crystals?.map((c, i) => <span key={i} className="pill pill-purple">{c}</span>)}
+                </div>
+            </div>
+            <div className="detail-section">
+                <h4>🍽️ Food Alchemy</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {cycleInfo.foodAlchemy?.map((f, i) => <span key={i} className="pill pill-teal">{f}</span>)}
+                </div>
+            </div>
+        </>
+    );
+}
+
+// ─── Global Sync Detail Page ───
+function SyncDetail({ syncStats, cycleInfo }) {
+    return (
+        <>
+            <div className="detail-hero" style={{ background: 'linear-gradient(135deg, rgba(0,245,212,0.15), rgba(168,85,247,0.1))' }}>
+                <div style={{ fontSize: '3rem' }}>🌍</div>
+                <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#00f5d4' }}>{syncStats?.synced?.toLocaleString() || '—'}</div>
+                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>women globally synced with your cycle</div>
+            </div>
+            <div className="detail-grid">
+                <div className="detail-item">
+                    <div className="detail-item-label">Total Community</div>
+                    <div className="detail-item-value">{syncStats?.total?.toLocaleString() || '—'}</div>
+                </div>
+                <div className="detail-item">
+                    <div className="detail-item-label">Same Day</div>
+                    <div className="detail-item-value" style={{ color: '#00f5d4' }}>{syncStats?.sameDay?.toLocaleString() || '—'}</div>
+                </div>
+                <div className="detail-item">
+                    <div className="detail-item-label">Same Phase</div>
+                    <div className="detail-item-value" style={{ color: '#a855f7' }}>{syncStats?.samePhase?.toLocaleString() || '—'}</div>
+                </div>
+                <div className="detail-item">
+                    <div className="detail-item-label">Exact Twins</div>
+                    <div className="detail-item-value" style={{ color: '#ffd700' }}>{syncStats?.exactTwins?.toLocaleString() || '—'} 👯</div>
+                </div>
+            </div>
+            <div className="detail-section">
+                <h4>🔗 What is Cycle Syncing?</h4>
+                <p>Menstrual synchrony (the "McClintock effect") suggests women who live or spend time together may synchronize their cycles. Global Fycle extends this concept — tracking how thousands of women worldwide share similar cycle timing, creating an invisible web of biological connection.</p>
+            </div>
+            <div className="detail-section">
+                <h4>📊 Your Sync Breakdown</h4>
+                <p><strong style={{ color: '#00f5d4' }}>Same Day ({syncStats?.sameDay || 0})</strong> — These women are on the exact same cycle day as you right now.</p>
+                <p><strong style={{ color: '#a855f7' }}>Same Phase ({syncStats?.samePhase || 0})</strong> — In the same menstrual phase (menstrual, follicular, ovulation, or luteal).</p>
+                <p><strong style={{ color: '#ffd700' }}>Cycle Twins ({syncStats?.exactTwins || 0})</strong> — Women with nearly identical cycle timing — your cosmic sisters!</p>
+            </div>
+            {syncStats?.topCountries?.length > 0 && (
+                <div className="detail-section">
+                    <h4>🌐 Top Synced Countries</h4>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {syncStats.topCountries.map((c, i) => (
+                            <span key={i} className="pill pill-teal">{c.country}: {c.count}</span>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </>
+    );
+}
+
+// ─── Consciousness Index Detail Page ───
+function ConsciousnessDetail({ noosphere, moonData }) {
+    return (
+        <>
+            <div className="detail-hero" style={{ background: 'linear-gradient(135deg, rgba(255,215,0,0.15), rgba(168,85,247,0.1))' }}>
+                <div style={{ fontSize: '3rem' }}>🧠</div>
+                <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#ffd700' }}>{noosphere.index}</div>
+                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>{noosphere.level} Consciousness</div>
+            </div>
+            <div className="detail-grid">
+                <div className="detail-item">
+                    <div className="detail-item-label">Lunar Factor</div>
+                    <div className="detail-item-value" style={{ color: '#ffd700' }}>{noosphere.lunarFactor}%</div>
+                </div>
+                <div className="detail-item">
+                    <div className="detail-item-label">Schumann Hz</div>
+                    <div className="detail-item-value" style={{ color: '#00f5d4' }}>{noosphere.schumannResonance}</div>
+                </div>
+                <div className="detail-item">
+                    <div className="detail-item-label">Sync Wave</div>
+                    <div className="detail-item-value" style={{ color: '#a855f7' }}>{noosphere.globalSyncWave}%</div>
+                </div>
+                <div className="detail-item">
+                    <div className="detail-item-label">Moon Phase</div>
+                    <div className="detail-item-value">{moonData.emoji} {moonData.phaseName}</div>
+                </div>
+            </div>
+            <div className="detail-section">
+                <h4>✨ What is the Consciousness Index?</h4>
+                <p>The Noosphere Consciousness Index combines multiple cosmic and biological signals into a single number representing the collective feminine consciousness. It incorporates lunar cycles, Earth's Schumann resonance (the planet's electromagnetic heartbeat at ~7.83 Hz), and global menstrual synchronization patterns.</p>
+            </div>
+            <div className="detail-section">
+                <h4>🌙 Current Cosmic Factors</h4>
+                <p><strong style={{ color: '#ffd700' }}>Lunar Factor ({noosphere.lunarFactor}%)</strong> — How strongly the current moon phase influences collective energy. Full and New moons have the strongest pull.</p>
+                <p><strong style={{ color: '#00f5d4' }}>Schumann Resonance ({noosphere.schumannResonance} Hz)</strong> — Earth's natural electromagnetic frequency. Variations correlate with collective mood shifts and heightened intuition.</p>
+                <p><strong style={{ color: '#a855f7' }}>Global Sync Wave ({noosphere.globalSyncWave}%)</strong> — The percentage of women worldwide whose cycles are harmonically aligned right now.</p>
+            </div>
+            <div className="detail-section">
+                <h4>📖 The Noosphere Theory</h4>
+                <p>{noosphere.description}</p>
+            </div>
+        </>
+    );
+}
+
 export default function Dashboard() {
-    const { cycleInfo, moonData, zodiac, noosphere, syncStats, dailyLog } = useApp();
+    const { cycleInfo, moonData, zodiac, noosphere, syncStats, dailyLog, setCurrentPage } = useApp();
+    const [activeDetail, setActiveDetail] = useState(null);
     const today = new Date();
     const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -19,28 +187,31 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* Top Stats Row */}
+            {/* Top Stats Row — CLICKABLE */}
             <div className="dashboard-grid three-col" style={{ marginBottom: 20 }}>
-                <div className="glass-card stat-card">
+                <div className="glass-card stat-card clickable-card" onClick={() => setActiveDetail('period')}>
                     <div className="stat-icon magenta">🩸</div>
                     <div>
                         <div className="stat-value">{cycleInfo.daysUntilNextPeriod}</div>
                         <div className="stat-label">Days Until Period</div>
                     </div>
+                    <div className="card-arrow">→</div>
                 </div>
-                <div className="glass-card stat-card">
+                <div className="glass-card stat-card clickable-card" onClick={() => setActiveDetail('sync')}>
                     <div className="stat-icon teal">🌍</div>
                     <div>
                         <div className="stat-value">{syncStats && syncStats.synced > 0 ? syncStats.synced.toLocaleString() : '—'}</div>
                         <div className="stat-label">Global Sync</div>
                     </div>
+                    <div className="card-arrow">→</div>
                 </div>
-                <div className="glass-card stat-card">
+                <div className="glass-card stat-card clickable-card" onClick={() => setActiveDetail('consciousness')}>
                     <div className="stat-icon gold">✨</div>
                     <div>
                         <div className="stat-value">{noosphere.index}</div>
                         <div className="stat-label">Consciousness Index</div>
                     </div>
+                    <div className="card-arrow">→</div>
                 </div>
             </div>
 
@@ -88,8 +259,8 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Noosphere Card */}
-                <div className="glass-card noosphere-card">
+                {/* Noosphere Card — CLICKABLE */}
+                <div className="glass-card noosphere-card clickable-card" onClick={() => setActiveDetail('consciousness')}>
                     <div className="noosphere-content">
                         <div className="section-header"><span className="section-icon">🧠</span><h3>Noosphere Index</h3></div>
                         <div className="noosphere-value">{noosphere.index}</div>
@@ -110,26 +281,29 @@ export default function Dashboard() {
                             </div>
                         </div>
                     </div>
+                    <div className="card-arrow" style={{ position: 'absolute', top: 16, right: 16 }}>→</div>
                 </div>
             </div>
 
             <div className="dashboard-grid three-col" style={{ marginBottom: 20 }}>
-                {/* Cosmic Card */}
-                <div className="glass-card cosmic-insight-card">
+                {/* Moon Insight — CLICKABLE */}
+                <div className="glass-card cosmic-insight-card clickable-card" onClick={() => setCurrentPage('moon-calendar')}>
                     <div className="insight-type">🌙 Moon Insight</div>
                     <div className="insight-text">{moonData.menstrualCorrelation.desc.slice(0, 120)}...</div>
                     <div style={{ marginTop: 8, fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>
                         Lunar Resonance: {moonData.menstrualCorrelation.resonance}%
                     </div>
+                    <div className="card-arrow">View Calendar →</div>
                 </div>
 
-                {/* Zodiac Card */}
-                <div className="glass-card cosmic-insight-card" style={{ borderLeftColor: '#a855f7' }}>
+                {/* Zodiac Card — CLICKABLE */}
+                <div className="glass-card cosmic-insight-card clickable-card" style={{ borderLeftColor: '#a855f7' }} onClick={() => setCurrentPage('cosmic')}>
                     <div className="insight-type" style={{ color: '#a855f7' }}>{zodiac.emoji} {zodiac.sign} Season</div>
                     <div className="insight-text">{zodiac.cycleInfluence.slice(0, 120)}...</div>
                     <div style={{ marginTop: 8, fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>
                         Element: {zodiac.element} | Ruling: {zodiac.ruling}
                     </div>
+                    <div className="card-arrow">View Cosmic Map →</div>
                 </div>
 
                 {/* Biorhythm Card */}
@@ -199,6 +373,23 @@ export default function Dashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* Detail Modals */}
+            {activeDetail === 'period' && (
+                <DetailModal title="🩸 Period Prediction" onClose={() => setActiveDetail(null)}>
+                    <PeriodDetail cycleInfo={cycleInfo} moonData={moonData} />
+                </DetailModal>
+            )}
+            {activeDetail === 'sync' && (
+                <DetailModal title="🌍 Global Sync" onClose={() => setActiveDetail(null)}>
+                    <SyncDetail syncStats={syncStats} cycleInfo={cycleInfo} />
+                </DetailModal>
+            )}
+            {activeDetail === 'consciousness' && (
+                <DetailModal title="✨ Consciousness Index" onClose={() => setActiveDetail(null)}>
+                    <ConsciousnessDetail noosphere={noosphere} moonData={moonData} />
+                </DetailModal>
+            )}
         </div>
     );
 }

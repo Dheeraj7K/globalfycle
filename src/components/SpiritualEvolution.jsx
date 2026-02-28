@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../App';
+import { saveJournalEntry, getJournalEntries } from '../firebase';
 
 const FEED_ITEMS = [
     { id: 1, emoji: '🧘', title: 'Menstrual Phase Yoga', desc: 'Gentle yin poses to honor your body during menstruation. Hold each for 3-5 breaths.', category: 'Movement', height: 180 },
@@ -27,12 +28,56 @@ const LEVELS = [
 ];
 
 export default function SpiritualEvolution() {
-    const { cycleInfo } = useApp();
+    const { cycleInfo, user } = useApp();
     const [activeTab, setActiveTab] = useState('feed');
     const [completedRituals, setCompletedRituals] = useState([]);
 
-    // XP is derived from completed rituals — starts at 0
-    const currentXP = completedRituals.reduce((sum, r) => sum + r.xp, 0);
+    // Journal state
+    const [journalText, setJournalText] = useState('');
+    const [journalMood, setJournalMood] = useState(null);
+    const [journalPublic, setJournalPublic] = useState(false);
+    const [journalEntries, setJournalEntries] = useState([]);
+    const [journalSaving, setJournalSaving] = useState(false);
+    const [journalSaved, setJournalSaved] = useState(false);
+
+    // Load journal entries
+    useEffect(() => {
+        if (user?.uid) {
+            getJournalEntries(user.uid, 30).then(entries => {
+                setJournalEntries(entries);
+            }).catch(err => console.warn('Failed to load journal:', err));
+        }
+    }, [user?.uid]);
+
+    const handleSaveJournal = async () => {
+        if (!journalText.trim() || !user?.uid) return;
+        setJournalSaving(true);
+        try {
+            const entry = {
+                text: journalText,
+                mood: journalMood,
+                phase: cycleInfo.phaseName,
+                phaseEmoji: cycleInfo.phaseEmoji,
+                cycleDay: cycleInfo.dayOfCycle,
+                isPublic: journalPublic,
+                cosmicName: user.name,
+                date: new Date().toISOString().split('T')[0],
+            };
+            await saveJournalEntry(user.uid, entry);
+            setJournalEntries(prev => [{ ...entry, id: Date.now().toString() }, ...prev]);
+            setJournalText('');
+            setJournalMood(null);
+            setJournalSaved(true);
+            setTimeout(() => setJournalSaved(false), 3000);
+        } catch (err) {
+            console.warn('Failed to save journal entry:', err);
+        } finally {
+            setJournalSaving(false);
+        }
+    };
+
+    // XP is derived from completed rituals + journal entries
+    const currentXP = completedRituals.reduce((sum, r) => sum + r.xp, 0) + (journalEntries.length * 15);
     const currentLevel = LEVELS.find((_, i) => i + 1 < LEVELS.length && currentXP >= LEVELS[i].xp && currentXP < LEVELS[i + 1].xp) || LEVELS[0];
     const nextLevel = LEVELS[LEVELS.indexOf(currentLevel) + 1] || LEVELS[LEVELS.length - 1];
     const progress = nextLevel.xp > currentLevel.xp ? ((currentXP - currentLevel.xp) / (nextLevel.xp - currentLevel.xp)) * 100 : 100;
@@ -53,6 +98,22 @@ export default function SpiritualEvolution() {
         { emoji: '📓', name: 'Evening Reflection', desc: 'Write 3 things you\'re grateful for in your cycle journal', xp: 10 },
         { emoji: '🌙', name: `${cycleInfo.soundFrequency}Hz Sound Bath`, desc: `Listen to ${cycleInfo.soundFrequency}Hz frequency for 5 minutes — your phase-specific healing tone`, xp: 10 },
     ];
+
+    const MOOD_OPTIONS = [
+        { id: 'peaceful', emoji: '😌', label: 'Peaceful' },
+        { id: 'joyful', emoji: '😊', label: 'Joyful' },
+        { id: 'reflective', emoji: '🤔', label: 'Reflective' },
+        { id: 'empowered', emoji: '💪', label: 'Empowered' },
+        { id: 'tender', emoji: '🥺', label: 'Tender' },
+        { id: 'creative', emoji: '🎨', label: 'Creative' },
+        { id: 'restless', emoji: '😤', label: 'Restless' },
+        { id: 'grateful', emoji: '🙏', label: 'Grateful' },
+    ];
+
+    const journalPrompt = cycleInfo.phase === 'menstrual' ? '"What am I ready to release?"'
+        : cycleInfo.phase === 'follicular' ? '"What new seeds am I planting in my life?"'
+            : cycleInfo.phase === 'ovulation' ? '"Where am I shining brightest right now?"'
+                : '"What needs completing before my next renewal?"';
 
     return (
         <div className="animate-fadeIn">
@@ -81,7 +142,7 @@ export default function SpiritualEvolution() {
                     </div>
                     {currentXP === 0 && (
                         <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
-                            Complete daily rituals to earn XP and level up ✨
+                            Complete daily rituals and write journal entries to earn XP ✨
                         </div>
                     )}
                 </div>
@@ -113,24 +174,107 @@ export default function SpiritualEvolution() {
             )}
 
             {activeTab === 'journal' && (
-                <div className="glass-card" style={{ maxWidth: 600 }}>
-                    <div className="section-header"><span className="section-icon">📓</span><h3>Cycle Journal</h3></div>
-                    <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
-                        Reflect on your {cycleInfo.phaseName} phase. What is your body telling you today?
-                    </p>
-                    <div style={{ marginBottom: 12, padding: 14, background: 'rgba(255,45,120,0.06)', borderRadius: 12, borderLeft: '3px solid #ff2d78' }}>
-                        <div style={{ fontSize: '0.65rem', color: '#ff2d78', fontWeight: 600, marginBottom: 4 }}>JOURNAL PROMPT</div>
-                        <div style={{ fontSize: '0.88rem', fontStyle: 'italic', color: 'rgba(255,255,255,0.7)' }}>
-                            {cycleInfo.phase === 'menstrual' ? '"What am I ready to release?"' :
-                                cycleInfo.phase === 'follicular' ? '"What new seeds am I planting in my life?"' :
-                                    cycleInfo.phase === 'ovulation' ? '"Where am I shining brightest right now?"' :
-                                        '"What needs completing before my next renewal?"'}
+                <div style={{ maxWidth: 650 }}>
+                    {/* Write Entry */}
+                    <div className="glass-card" style={{ marginBottom: 20 }}>
+                        <div className="section-header"><span className="section-icon">📓</span><h3>New Journal Entry</h3></div>
+                        <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', marginBottom: 12 }}>
+                            Reflect on your {cycleInfo.phaseName} phase. What is your body telling you today?
+                        </p>
+
+                        {/* Phase prompt */}
+                        <div style={{ marginBottom: 16, padding: 14, background: 'rgba(255,45,120,0.06)', borderRadius: 12, borderLeft: '3px solid #ff2d78' }}>
+                            <div style={{ fontSize: '0.65rem', color: '#ff2d78', fontWeight: 600, marginBottom: 4 }}>JOURNAL PROMPT</div>
+                            <div style={{ fontSize: '0.88rem', fontStyle: 'italic', color: 'rgba(255,255,255,0.7)' }}>{journalPrompt}</div>
                         </div>
+
+                        {/* Mood selector */}
+                        <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>How are you feeling?</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {MOOD_OPTIONS.map(m => (
+                                    <button key={m.id}
+                                        className={`pill ${journalMood === m.id ? 'pill-magenta' : ''}`}
+                                        style={{ cursor: 'pointer', opacity: journalMood && journalMood !== m.id ? 0.4 : 1, transition: 'all 0.2s' }}
+                                        onClick={() => setJournalMood(journalMood === m.id ? null : m.id)}
+                                    >
+                                        {m.emoji} {m.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Text area */}
+                        <textarea
+                            className="input-field"
+                            placeholder="Write freely... your thoughts, feelings, dreams, and reflections."
+                            style={{ minHeight: 180, resize: 'vertical' }}
+                            value={journalText}
+                            onChange={e => setJournalText(e.target.value)}
+                        />
+
+                        {/* Privacy toggle */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: 12 }}>
+                            <div>
+                                <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>
+                                    {journalPublic ? '🌍 Share with sisterhood' : '🔒 Private — only you can see'}
+                                </div>
+                                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)' }}>
+                                    {journalPublic ? 'Others can read your entry (with your cosmic name)' : 'This stays in your personal journal only'}
+                                </div>
+                            </div>
+                            <div
+                                className={`toggle ${journalPublic ? 'active' : ''}`}
+                                onClick={() => setJournalPublic(!journalPublic)}
+                            />
+                        </div>
+
+                        {/* Save button */}
+                        <button
+                            className="btn btn-primary"
+                            style={{ marginTop: 14, width: '100%', justifyContent: 'center', opacity: journalText.trim() ? 1 : 0.5 }}
+                            onClick={handleSaveJournal}
+                            disabled={!journalText.trim() || journalSaving}
+                        >
+                            {journalSaving ? '✨ Saving...' : journalSaved ? '✓ Saved! +15 XP' : '💫 Save Entry (+15 XP)'}
+                        </button>
                     </div>
-                    <textarea className="input-field" placeholder="Write freely..." style={{ minHeight: 200, resize: 'vertical' }} />
-                    <button className="btn btn-primary" style={{ marginTop: 12, width: '100%', justifyContent: 'center' }}>
-                        💫 Save Entry (+15 XP)
-                    </button>
+
+                    {/* Past Entries */}
+                    {journalEntries.length > 0 && (
+                        <div className="glass-card">
+                            <div className="section-header"><span className="section-icon">📖</span><h3>Past Entries ({journalEntries.length})</h3></div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {journalEntries.map(entry => (
+                                    <div key={entry.id} style={{ padding: 14, background: 'rgba(255,255,255,0.03)', borderRadius: 12, borderLeft: '3px solid rgba(168,85,247,0.4)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>
+                                                    {entry.date || (entry.createdAt?.toDate ? entry.createdAt.toDate().toLocaleDateString() : 'Recently')}
+                                                </span>
+                                                <span className="pill pill-purple" style={{ fontSize: '0.6rem', padding: '2px 8px' }}>{entry.phaseEmoji} {entry.phase}</span>
+                                                {entry.mood && <span style={{ fontSize: '0.8rem' }}>{MOOD_OPTIONS.find(m => m.id === entry.mood)?.emoji || ''}</span>}
+                                            </div>
+                                            <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.25)' }}>
+                                                {entry.isPublic ? '🌍 Public' : '🔒 Private'} • Day {entry.cycleDay}
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                            {entry.text}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {journalEntries.length === 0 && (
+                        <div className="glass-card" style={{ textAlign: 'center', padding: 30 }}>
+                            <div style={{ fontSize: '2rem', marginBottom: 8 }}>📓</div>
+                            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem' }}>Your journal is empty. Write your first entry above!</div>
+                            <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', marginTop: 4 }}>Each entry earns you 15 XP towards your spiritual evolution</div>
+                        </div>
+                    )}
                 </div>
             )}
 

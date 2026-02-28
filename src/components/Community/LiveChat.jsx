@@ -35,6 +35,25 @@ export default function LiveChat() {
     const [showRooms, setShowRooms] = useState(false);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+    const [reactions, setReactions] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('fycle_chat_reactions') || '{}'); }
+        catch { return {}; }
+    });
+    const [openReactionPicker, setOpenReactionPicker] = useState(null);
+
+    const REACTION_EMOJIS = ['❤️', '🔥', '🌙', '✨', '🤗', '💪'];
+
+    const toggleReaction = (msgId, emoji) => {
+        setReactions(prev => {
+            const msgReactions = { ...(prev[msgId] || {}) };
+            if (msgReactions[emoji]) { delete msgReactions[emoji]; }
+            else { msgReactions[emoji] = true; }
+            const next = { ...prev, [msgId]: msgReactions };
+            localStorage.setItem('fycle_chat_reactions', JSON.stringify(next));
+            return next;
+        });
+        setOpenReactionPicker(null);
+    };
 
     // Subscribe to real-time messages
     useEffect(() => {
@@ -166,6 +185,55 @@ export default function LiveChat() {
                                         onMouseLeave={e => e.target.style.opacity = 0.5}
                                         title="Delete message">✕</button>
                                 )}
+                            </div>
+                            {/* Reactions row */}
+                            <div style={{ display: 'flex', gap: 4, marginTop: 3, padding: '0 4px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                {Object.entries(reactions[msg.id] || {}).filter(([, v]) => v).map(([emoji]) => (
+                                    <button key={emoji} onClick={() => toggleReaction(msg.id, emoji)}
+                                        style={{
+                                            background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)',
+                                            borderRadius: 16, padding: '1px 6px', cursor: 'pointer',
+                                            fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: 2,
+                                        }}>
+                                        <span>{emoji}</span>
+                                        <span style={{ color: '#a855f7', fontSize: '0.55rem', fontWeight: 600 }}>1</span>
+                                    </button>
+                                ))}
+                                <div style={{ position: 'relative' }}>
+                                    <button onClick={() => setOpenReactionPicker(openReactionPicker === msg.id ? null : msg.id)}
+                                        style={{
+                                            background: 'transparent', border: 'none',
+                                            fontSize: '0.6rem', cursor: 'pointer',
+                                            color: 'rgba(255,255,255,0.2)', padding: '2px 4px',
+                                            transition: 'color 0.2s',
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
+                                        onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}>
+                                        😊+
+                                    </button>
+                                    {openReactionPicker === msg.id && (
+                                        <div style={{
+                                            position: 'absolute', bottom: '100%',
+                                            [isOwn ? 'right' : 'left']: 0, marginBottom: 4,
+                                            background: 'rgba(20,10,30,0.95)', border: '1px solid rgba(168,85,247,0.3)',
+                                            borderRadius: 12, padding: '4px 6px', display: 'flex', gap: 1,
+                                            boxShadow: '0 6px 20px rgba(0,0,0,0.6)', zIndex: 10,
+                                        }}>
+                                            {REACTION_EMOJIS.map(emoji => (
+                                                <button key={emoji} onClick={() => toggleReaction(msg.id, emoji)}
+                                                    style={{
+                                                        background: reactions[msg.id]?.[emoji] ? 'rgba(168,85,247,0.2)' : 'transparent',
+                                                        border: 'none', borderRadius: 6, padding: '4px 5px',
+                                                        fontSize: '1rem', cursor: 'pointer', transition: 'all 0.15s',
+                                                    }}
+                                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.3)'}
+                                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                                                    {emoji}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     );

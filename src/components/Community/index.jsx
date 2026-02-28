@@ -117,6 +117,28 @@ export default function Community() {
     const [selectedGroup, setSelectedGroup] = useState(null);
     const [newMessage, setNewMessage] = useState('');
     const [localMessages, setLocalMessages] = useState({});
+    const [reactions, setReactions] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('fycle_reactions') || '{}'); }
+        catch { return {}; }
+    });
+    const [openReactionPicker, setOpenReactionPicker] = useState(null);
+
+    const REACTION_EMOJIS = ['❤️', '🔥', '🌙', '✨', '🤗', '💪'];
+
+    const toggleReaction = (postId, emoji) => {
+        setReactions(prev => {
+            const postReactions = { ...(prev[postId] || {}) };
+            if (postReactions[emoji]) {
+                delete postReactions[emoji];
+            } else {
+                postReactions[emoji] = true;
+            }
+            const next = { ...prev, [postId]: postReactions };
+            localStorage.setItem('fycle_reactions', JSON.stringify(next));
+            return next;
+        });
+        setOpenReactionPicker(null);
+    };
 
     // Persist joins
     useEffect(() => {
@@ -258,9 +280,70 @@ export default function Community() {
                                     <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)' }}>{post.timeAgo}</span>
                                 </div>
                                 <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.85rem', lineHeight: 1.5, margin: 0 }}>{post.text}</p>
-                                <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-                                    <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', cursor: 'pointer' }}>❤️ {post.likes}</span>
-                                    <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', cursor: 'pointer' }}>💬 {post.replies}</span>
+                                <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                                    {/* Existing reactions */}
+                                    {Object.entries(reactions[post.id] || {}).filter(([, v]) => v).map(([emoji]) => (
+                                        <button key={emoji} onClick={() => toggleReaction(post.id, emoji)}
+                                            style={{
+                                                background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)',
+                                                borderRadius: 20, padding: '3px 8px', cursor: 'pointer',
+                                                fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 3,
+                                                transition: 'all 0.2s',
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(168,85,247,0.3)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(168,85,247,0.15)'}>
+                                            <span>{emoji}</span>
+                                            <span style={{ color: '#a855f7', fontSize: '0.65rem', fontWeight: 600 }}>1</span>
+                                        </button>
+                                    ))}
+                                    {/* Seeded reactions from post data */}
+                                    {!reactions[post.id]?.['❤️'] && post.likes > 0 && (
+                                        <button onClick={() => toggleReaction(post.id, '❤️')}
+                                            style={{
+                                                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+                                                borderRadius: 20, padding: '3px 8px', cursor: 'pointer',
+                                                fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 3,
+                                            }}>
+                                            <span>❤️</span>
+                                            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.65rem' }}>{post.likes}</span>
+                                        </button>
+                                    )}
+                                    <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)' }}>💬 {post.replies}</span>
+                                    {/* Add reaction button */}
+                                    <div style={{ position: 'relative', marginLeft: 'auto' }}>
+                                        <button onClick={() => setOpenReactionPicker(openReactionPicker === post.id ? null : post.id)}
+                                            style={{
+                                                background: openReactionPicker === post.id ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)',
+                                                border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20,
+                                                padding: '3px 10px', cursor: 'pointer', fontSize: '0.7rem',
+                                                color: 'rgba(255,255,255,0.35)', transition: 'all 0.2s',
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                                            onMouseLeave={e => { if (openReactionPicker !== post.id) e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}>
+                                            😊+
+                                        </button>
+                                        {openReactionPicker === post.id && (
+                                            <div style={{
+                                                position: 'absolute', bottom: '100%', right: 0, marginBottom: 6,
+                                                background: 'rgba(20,10,30,0.95)', border: '1px solid rgba(168,85,247,0.3)',
+                                                borderRadius: 14, padding: '6px 8px', display: 'flex', gap: 2,
+                                                boxShadow: '0 8px 24px rgba(0,0,0,0.6)', zIndex: 10,
+                                            }}>
+                                                {REACTION_EMOJIS.map(emoji => (
+                                                    <button key={emoji} onClick={() => toggleReaction(post.id, emoji)}
+                                                        style={{
+                                                            background: reactions[post.id]?.[emoji] ? 'rgba(168,85,247,0.2)' : 'transparent',
+                                                            border: 'none', borderRadius: 8, padding: '6px 8px',
+                                                            fontSize: '1.2rem', cursor: 'pointer', transition: 'all 0.15s',
+                                                        }}
+                                                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.3)'}
+                                                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                                                        {emoji}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))}

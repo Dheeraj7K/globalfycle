@@ -37,11 +37,6 @@ export default function Profile() {
                         </div>
                         <div className="profile-info">
                             <h2>{user?.name || 'Cosmic Soul'}</h2>
-                            {user?.realName && (
-                                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>
-                                    🔒 Private name: {user.realName}
-                                </div>
-                            )}
                             <p>
                                 {age ? `${age} years old • ` : ''}
                                 {user?.provider || 'Email'} • Member since {

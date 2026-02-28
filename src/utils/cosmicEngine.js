@@ -216,61 +216,200 @@ export function getNatalChart(dob, birthTime, birthPlace) {
     };
 }
 
-// Planetary positions (simplified ephemeris)
-export function getPlanetaryPositions(date = new Date()) {
-    const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
-    const year = date.getFullYear();
+// ─── REAL Planetary Positions using J2000 Keplerian Orbital Elements ───
+// Source: NASA/JPL "Keplerian Elements for Approximate Positions of the Major Planets"
+// Accuracy: ~1° for inner planets, ~2° for outer planets (sufficient for visual orrery)
 
-    const planets = [
-        { name: 'Mercury', symbol: '☿', period: 87.97, color: '#b5b5b5', size: 8, orbitRadius: 60 },
-        { name: 'Venus', symbol: '♀', period: 224.7, color: '#ffcc66', size: 10, orbitRadius: 85 },
-        { name: 'Earth', symbol: '🜨', period: 365.25, color: '#4da6ff', size: 11, orbitRadius: 115 },
-        { name: 'Mars', symbol: '♂', period: 686.97, color: '#ff4444', size: 9, orbitRadius: 145 },
-        { name: 'Jupiter', symbol: '♃', period: 4332.59, color: '#f5c842', size: 16, orbitRadius: 180 },
-        { name: 'Saturn', symbol: '♄', period: 10759.22, color: '#e8d5a3', size: 14, orbitRadius: 210 },
-    ];
-
-    return planets.map(p => {
-        const angle = ((dayOfYear + (year * 365.25)) / p.period) * 360 % 360;
-        const radians = (angle * Math.PI) / 180;
-        return {
-            ...p,
-            angle,
-            x: Math.cos(radians) * p.orbitRadius,
-            y: Math.sin(radians) * p.orbitRadius,
-        };
-    });
+function julianDate(date) {
+    const y = date.getFullYear();
+    const m = date.getMonth() + 1;
+    const d = date.getDate() + date.getHours() / 24;
+    const a = Math.floor((14 - m) / 12);
+    const yy = y + 4800 - a;
+    const mm = m + 12 * a - 3;
+    return d + Math.floor((153 * mm + 2) / 5) + 365 * yy + Math.floor(yy / 4) - Math.floor(yy / 100) + Math.floor(yy / 400) - 32045.5;
 }
 
-// Check retrogrades (simplified)
-export function getRetrogrades(date = new Date()) {
-    const year = date.getFullYear();
-    // Approximate retrograde periods for 2025-2027
-    const retrogrades = [
-        {
-            planet: 'Mercury', symbol: '☿', periods: [
-                { start: `${year}-03-14`, end: `${year}-04-07` },
-                { start: `${year}-07-17`, end: `${year}-08-11` },
-                { start: `${year}-11-09`, end: `${year}-11-29` },
-            ]
-        },
-        {
-            planet: 'Venus', symbol: '♀', periods: [
-                { start: `${year}-03-01`, end: `${year}-04-12` },
-            ]
-        },
-        {
-            planet: 'Mars', symbol: '♂', periods: [
-                { start: `${year}-01-06`, end: `${year}-02-23` },
-            ]
-        },
-    ];
+function solveKepler(M, e, tol = 1e-8) {
+    // Solve Kepler's equation M = E - e*sin(E) via Newton-Raphson
+    let E = M;
+    for (let i = 0; i < 100; i++) {
+        const dE = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+        E -= dE;
+        if (Math.abs(dE) < tol) break;
+    }
+    return E;
+}
 
-    const dateStr = date.toISOString().split('T')[0];
-    return retrogrades.map(r => {
-        const isRetrograde = r.periods.some(p => dateStr >= p.start && dateStr <= p.end);
-        return { ...r, isRetrograde };
-    }).filter(r => r.isRetrograde);
+// J2000 orbital elements [a(AU), e, I(deg), L(deg), longPeri(deg), longNode(deg)]
+// and century rates       [da,     de, dI,     dL,    dwBar,       dOmega]
+const ORBITAL_ELEMENTS = {
+    Mercury: {
+        a0: 0.38709927, da: 0.00000037, e0: 0.20563593, de: 0.00001906,
+        I0: 7.00497902, dI: -0.00594749, L0: 252.25032350, dL: 149472.67411175,
+        wBar0: 77.45779628, dwBar: 0.16047689, Om0: 48.33076593, dOm: -0.12534081,
+        color: '#b5b5b5', size: 6, symbol: '☿',
+    },
+    Venus: {
+        a0: 0.72333566, da: 0.00000390, e0: 0.00677672, de: -0.00004107,
+        I0: 3.39467605, dI: -0.00078890, L0: 181.97909950, dL: 58517.81538729,
+        wBar0: 131.60246718, dwBar: 0.00268329, Om0: 76.67984255, dOm: -0.27769418,
+        color: '#ffcc66', size: 9, symbol: '♀',
+    },
+    Earth: {
+        a0: 1.00000261, da: 0.00000562, e0: 0.01671123, de: -0.00004392,
+        I0: -0.00001531, dI: -0.01294668, L0: 100.46457166, dL: 35999.37244981,
+        wBar0: 102.93768193, dwBar: 0.32327364, Om0: 0.0, dOm: 0.0,
+        color: '#4da6ff', size: 10, symbol: '🜨',
+    },
+    Mars: {
+        a0: 1.52371034, da: 0.00001847, e0: 0.09339410, de: 0.00007882,
+        I0: 1.84969142, dI: -0.00813131, L0: -4.55343205, dL: 19140.30268499,
+        wBar0: -23.94362959, dwBar: 0.44441088, Om0: 49.55953891, dOm: -0.29257343,
+        color: '#ff4444', size: 8, symbol: '♂',
+    },
+    Jupiter: {
+        a0: 5.20288700, da: -0.00011607, e0: 0.04838624, de: -0.00013253,
+        I0: 1.30439695, dI: -0.00183714, L0: 34.39644051, dL: 3034.74612775,
+        wBar0: 14.72847983, dwBar: 0.21252668, Om0: 100.47390909, dOm: 0.20469106,
+        color: '#f5c842', size: 14, symbol: '♃',
+    },
+    Saturn: {
+        a0: 9.53667594, da: -0.00125060, e0: 0.05386179, de: -0.00050991,
+        I0: 2.48599187, dI: 0.00193609, L0: 49.95424423, dL: 1222.49362201,
+        wBar0: 92.59887831, dwBar: -0.41897216, Om0: 113.66242448, dOm: -0.28867794,
+        color: '#e8d5a3', size: 12, symbol: '♄',
+    },
+    Uranus: {
+        a0: 19.18916464, da: -0.00196176, e0: 0.04725744, de: -0.00004397,
+        I0: 0.77263783, dI: -0.00242939, L0: 313.23810451, dL: 428.48202785,
+        wBar0: 170.95427630, dwBar: 0.40805281, Om0: 74.01692503, dOm: 0.04240589,
+        color: '#7fdbff', size: 11, symbol: '⛢',
+    },
+    Neptune: {
+        a0: 30.06992276, da: 0.00026291, e0: 0.00859048, de: 0.00005105,
+        I0: 1.77004347, dI: 0.00035372, L0: -55.12002969, dL: 218.45945325,
+        wBar0: 44.96476227, dwBar: -0.32241464, Om0: 131.78422574, dOm: -0.00508664,
+        color: '#4169e1', size: 11, symbol: '♆',
+    },
+};
+
+const ZODIAC_SIGNS_30 = [
+    { sign: 'Aries', emoji: '♈' }, { sign: 'Taurus', emoji: '♉' }, { sign: 'Gemini', emoji: '♊' },
+    { sign: 'Cancer', emoji: '♋' }, { sign: 'Leo', emoji: '♌' }, { sign: 'Virgo', emoji: '♍' },
+    { sign: 'Libra', emoji: '♎' }, { sign: 'Scorpio', emoji: '♏' }, { sign: 'Sagittarius', emoji: '♐' },
+    { sign: 'Capricorn', emoji: '♑' }, { sign: 'Aquarius', emoji: '♒' }, { sign: 'Pisces', emoji: '♓' },
+];
+
+function eclipticLongitudeToZodiac(lon) {
+    const norm = ((lon % 360) + 360) % 360;
+    const idx = Math.floor(norm / 30);
+    const deg = Math.floor(norm % 30);
+    return { ...ZODIAC_SIGNS_30[idx], degree: deg, totalDegrees: norm };
+}
+
+export function getPlanetaryPositions(date = new Date()) {
+    const JD = julianDate(date);
+    const T = (JD - 2451545.0) / 36525.0; // centuries since J2000
+
+    const results = [];
+    let earthLon = 0; // we need Earth's longitude to compute geocentric positions
+
+    // First pass: compute heliocentric ecliptic longitude for each planet
+    for (const [name, el] of Object.entries(ORBITAL_ELEMENTS)) {
+        const a = el.a0 + el.da * T;
+        const e = el.e0 + el.de * T;
+        const L = ((el.L0 + el.dL * T) % 360 + 360) % 360; // mean longitude (deg)
+        const wBar = el.wBar0 + el.dwBar * T;               // longitude of perihelion (deg)
+
+        // Mean anomaly
+        const M = ((L - wBar) % 360 + 360) % 360;
+        const M_rad = M * Math.PI / 180;
+
+        // Solve Kepler's equation for Eccentric anomaly
+        const E = solveKepler(M_rad, e);
+
+        // True anomaly
+        const nu = 2 * Math.atan2(
+            Math.sqrt(1 + e) * Math.sin(E / 2),
+            Math.sqrt(1 - e) * Math.cos(E / 2)
+        );
+
+        // Heliocentric ecliptic longitude
+        const helioLon = ((nu * 180 / Math.PI + wBar) % 360 + 360) % 360;
+
+        // Heliocentric distance
+        const r = a * (1 - e * Math.cos(E));
+
+        // Heliocentric cartesian (ecliptic plane, simplified — ignoring inclination for 2D orrery)
+        const helioLonRad = helioLon * Math.PI / 180;
+        const x_AU = r * Math.cos(helioLonRad);
+        const y_AU = r * Math.sin(helioLonRad);
+
+        if (name === 'Earth') earthLon = helioLon;
+
+        results.push({
+            name, symbol: el.symbol, color: el.color, size: el.size,
+            a, e, helioLon, r,
+            x_AU, y_AU,
+            zodiac: eclipticLongitudeToZodiac(helioLon),
+        });
+    }
+
+    // Second pass: compute geocentric ecliptic longitude for each planet
+    const earthData = results.find(p => p.name === 'Earth');
+    for (const p of results) {
+        if (p.name === 'Earth') {
+            // For Earth, geocentric longitude is Sun's position (opposite)
+            p.geoLon = ((earthLon + 180) % 360 + 360) % 360;
+        } else {
+            // Geocentric longitude from Earth's perspective
+            const dx = p.x_AU - earthData.x_AU;
+            const dy = p.y_AU - earthData.y_AU;
+            p.geoLon = ((Math.atan2(dy, dx) * 180 / Math.PI) % 360 + 360) % 360;
+        }
+        p.geoZodiac = eclipticLongitudeToZodiac(p.geoLon);
+    }
+
+    return results;
+}
+
+// ─── Detect retrogrades from real orbital motion ───
+// A planet is retrograde when its geocentric longitude is decreasing (apparent backward motion)
+export function getRetrogrades(date = new Date()) {
+    const yesterday = new Date(date); yesterday.setDate(yesterday.getDate() - 2);
+    const tomorrow = new Date(date); tomorrow.setDate(tomorrow.getDate() + 2);
+
+    const posNow = getPlanetaryPositions(date);
+    const posBefore = getPlanetaryPositions(yesterday);
+    const posAfter = getPlanetaryPositions(tomorrow);
+
+    const results = [];
+    const PLANETS_TO_CHECK = ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune'];
+
+    for (const name of PLANETS_TO_CHECK) {
+        const now = posNow.find(p => p.name === name);
+        const before = posBefore.find(p => p.name === name);
+        const after = posAfter.find(p => p.name === name);
+        if (!now || !before || !after) continue;
+
+        // Check if geocentric longitude is decreasing (retrograde)
+        // Handle wrap-around at 0°/360°
+        let dLon = after.geoLon - before.geoLon;
+        if (dLon > 180) dLon -= 360;
+        if (dLon < -180) dLon += 360;
+
+        if (dLon < 0) {
+            results.push({
+                planet: name,
+                symbol: now.symbol,
+                isRetrograde: true,
+                apparentMotion: dLon.toFixed(2) + '°/day',
+            });
+        }
+    }
+
+    return results;
 }
 
 // Noosphere / Consciousness Index
@@ -278,13 +417,8 @@ export function getNoosphereIndex(date = new Date()) {
     const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
     const moon = getMoonPhase(date);
 
-    // Composite consciousness index based on:
-    // - Moon phase (full moon = peak collective consciousness)
-    // - Time of year (equinoxes and solstices are peaks)
-    // - Schumann resonance simulation (7.83 Hz base)
-
     const lunarFactor = moon.illumination / 100;
-    const equinoxProximity = Math.cos((dayOfYear - 80) * 2 * Math.PI / 365.25) * 0.5 + 0.5; // March equinox baseline
+    const equinoxProximity = Math.cos((dayOfYear - 80) * 2 * Math.PI / 365.25) * 0.5 + 0.5;
     const schumannVariation = Math.sin(dayOfYear * 0.1) * 0.15 + 0.85;
     const collectiveSync = (lunarFactor * 0.4 + equinoxProximity * 0.3 + schumannVariation * 0.3);
 
@@ -304,53 +438,242 @@ export function getNoosphereIndex(date = new Date()) {
     }
 
     return {
-        index,
-        level,
-        description,
-        color,
+        index, level, description, color,
         lunarFactor: Math.round(lunarFactor * 100),
         schumannResonance: (7.83 * schumannVariation).toFixed(2),
         globalSyncWave: Math.round(equinoxProximity * 100),
     };
 }
 
-// Get cosmic events near a date
-export function getCosmicEvents(date = new Date()) {
-    const month = date.getMonth();
-    const day = date.getDate();
+// ─── Comprehensive Cosmic Events Engine ───
+// Combines: auto-detected alignments + known astronomical events + zodiac transitions
 
-    const events = [
-        { month: 0, day: 20, name: 'Aquarius Season Begins', type: 'zodiac', emoji: '♒' },
-        { month: 1, day: 19, name: 'Pisces Season Begins', type: 'zodiac', emoji: '♓' },
-        { month: 2, day: 20, name: 'Spring Equinox', type: 'solar', emoji: '🌸' },
-        { month: 2, day: 21, name: 'Aries Season Begins', type: 'zodiac', emoji: '♈' },
-        { month: 3, day: 20, name: 'Taurus Season Begins', type: 'zodiac', emoji: '♉' },
-        { month: 4, day: 21, name: 'Gemini Season Begins', type: 'zodiac', emoji: '♊' },
-        { month: 5, day: 21, name: 'Summer Solstice', type: 'solar', emoji: '☀️' },
-        { month: 5, day: 21, name: 'Cancer Season Begins', type: 'zodiac', emoji: '♋' },
-        { month: 6, day: 23, name: 'Leo Season Begins', type: 'zodiac', emoji: '♌' },
-        { month: 7, day: 23, name: 'Virgo Season Begins', type: 'zodiac', emoji: '♍' },
-        { month: 8, day: 22, name: 'Autumn Equinox', type: 'solar', emoji: '🍂' },
-        { month: 8, day: 23, name: 'Libra Season Begins', type: 'zodiac', emoji: '♎' },
-        { month: 9, day: 23, name: 'Scorpio Season Begins', type: 'zodiac', emoji: '♏' },
-        { month: 10, day: 22, name: 'Sagittarius Season Begins', type: 'zodiac', emoji: '♐' },
-        { month: 11, day: 21, name: 'Winter Solstice', type: 'solar', emoji: '❄️' },
-        { month: 11, day: 22, name: 'Capricorn Season Begins', type: 'zodiac', emoji: '♑' },
-    ];
+function angularDistance(lon1, lon2) {
+    let d = Math.abs(lon1 - lon2);
+    if (d > 180) d = 360 - d;
+    return d;
+}
 
-    // Find upcoming events within 14 days
-    const upcoming = [];
-    for (let i = 0; i < 14; i++) {
-        const checkDate = new Date(date);
-        checkDate.setDate(checkDate.getDate() + i);
-        const cm = checkDate.getMonth();
-        const cd = checkDate.getDate();
-        events.forEach(e => {
-            if (e.month === cm && e.day === cd) {
-                upcoming.push({ ...e, daysAway: i, date: new Date(checkDate) });
+function detectPlanetaryAlignments(date) {
+    const events = [];
+    const positions = getPlanetaryPositions(date);
+    const visible = positions.filter(p => p.name !== 'Earth'); // only non-Earth planets
+
+    // ─── Planetary Parade Detection ───
+    // Check if 3+ planets are within a 40° arc (as seen geocentrically)
+    const geoLons = visible.map(p => ({ name: p.name, symbol: p.symbol, geoLon: p.geoLon, geoZodiac: p.geoZodiac }));
+    geoLons.sort((a, b) => a.geoLon - b.geoLon);
+
+    // Sliding window to find clusters
+    for (let i = 0; i < geoLons.length; i++) {
+        const cluster = [geoLons[i]];
+        for (let j = 1; j < geoLons.length; j++) {
+            const idx = (i + j) % geoLons.length;
+            let dist = geoLons[idx].geoLon - geoLons[i].geoLon;
+            if (dist < 0) dist += 360;
+            if (dist <= 45) {
+                cluster.push(geoLons[idx]);
             }
-        });
+        }
+
+        if (cluster.length >= 6) {
+            const names = cluster.map(c => c.name).join(', ');
+            events.push({
+                name: `Grand Planetary Parade: ${cluster.length} planets aligned!`,
+                emoji: '🪐✨',
+                type: 'parade',
+                priority: 1,
+                desc: `${names} are all visible within a ${Math.round(45)}° arc — a spectacular celestial event!`,
+                planets: cluster,
+            });
+            break; // Don't double-count
+        } else if (cluster.length >= 4) {
+            const names = cluster.map(c => c.name).join(', ');
+            events.push({
+                name: `Planetary Parade: ${cluster.length} planets aligned`,
+                emoji: '🪐',
+                type: 'parade',
+                priority: 2,
+                desc: `${names} are clustered together in the sky — a beautiful alignment visible to the naked eye.`,
+                planets: cluster,
+            });
+            break;
+        } else if (cluster.length === 3) {
+            const names = cluster.map(c => c.name).join(', ');
+            events.push({
+                name: `Triple Alignment: ${names}`,
+                emoji: '🔱',
+                type: 'alignment',
+                priority: 3,
+                desc: `Three planets gather closely — a noteworthy cosmic convergence.`,
+                planets: cluster,
+            });
+            break;
+        }
     }
 
-    return upcoming;
+    // ─── Close Conjunctions (2 planets within 8°) ───
+    for (let i = 0; i < visible.length; i++) {
+        for (let j = i + 1; j < visible.length; j++) {
+            const dist = angularDistance(visible[i].geoLon, visible[j].geoLon);
+            if (dist <= 8) {
+                events.push({
+                    name: `${visible[i].name}–${visible[j].name} Conjunction`,
+                    emoji: '🤝',
+                    type: 'conjunction',
+                    priority: dist <= 3 ? 2 : 4,
+                    desc: `${visible[i].symbol} and ${visible[j].symbol} are just ${dist.toFixed(1)}° apart — a close cosmic encounter.`,
+                    separation: dist,
+                });
+            }
+        }
+    }
+
+    // ─── Opposition Detection (outer planet 180° from Sun) ───
+    const earthP = positions.find(p => p.name === 'Earth');
+    const sunGeoLon = ((earthP.helioLon + 180) % 360 + 360) % 360;
+    ['Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune'].forEach(name => {
+        const p = visible.find(x => x.name === name);
+        if (!p) return;
+        const dist = angularDistance(p.geoLon, sunGeoLon);
+        if (dist >= 170) {
+            events.push({
+                name: `${name} at Opposition`,
+                emoji: '🌟',
+                type: 'opposition',
+                priority: 3,
+                desc: `${name} is opposite the Sun — at its brightest and closest to Earth. Best viewing conditions.`,
+            });
+        }
+    });
+
+    return events;
+}
+
+export function getCosmicEvents(date = new Date()) {
+    const year = date.getFullYear();
+
+    // ─── 1. Auto-detect live alignments from real positions ───
+    const liveEvents = detectPlanetaryAlignments(date);
+    // Mark as "today" events
+    liveEvents.forEach(e => { e.daysAway = 0; e.isLive = true; });
+
+    // ─── 2. Known astronomical events database (2025-2027) ───
+    const knownEvents = [
+        // 2025
+        { date: '2025-03-14', name: 'Total Lunar Eclipse', emoji: '🌑', type: 'eclipse' },
+        { date: '2025-03-20', name: 'Spring Equinox', emoji: '🌸', type: 'solar' },
+        { date: '2025-04-22', name: 'Lyrids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2025-05-12', name: 'Mercury at Greatest Elongation', emoji: '☿', type: 'planet' },
+        { date: '2025-06-21', name: 'Summer Solstice', emoji: '☀️', type: 'solar' },
+        { date: '2025-07-07', name: 'Supermoon', emoji: '🌕', type: 'moon' },
+        { date: '2025-08-12', name: 'Perseids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2025-09-07', name: 'Saturn at Opposition', emoji: '🪐', type: 'planet' },
+        { date: '2025-09-21', name: 'Partial Lunar Eclipse', emoji: '🌘', type: 'eclipse' },
+        { date: '2025-09-22', name: 'Autumn Equinox', emoji: '🍂', type: 'solar' },
+        { date: '2025-10-21', name: 'Orionids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2025-12-14', name: 'Geminids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2025-12-21', name: 'Winter Solstice', emoji: '❄️', type: 'solar' },
+        // 2026
+        { date: '2026-01-03', name: 'Quadrantids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2026-02-17', name: 'Total Lunar Eclipse', emoji: '🌑', type: 'eclipse' },
+        { date: '2026-02-28', name: 'Planetary Parade — 7 planets aligned', emoji: '🪐✨', type: 'parade' },
+        { date: '2026-03-03', name: 'Venus at Greatest Brilliance', emoji: '✨', type: 'planet' },
+        { date: '2026-03-20', name: 'Spring Equinox', emoji: '🌸', type: 'solar' },
+        { date: '2026-04-22', name: 'Lyrids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2026-05-06', name: 'Eta Aquarids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2026-06-21', name: 'Summer Solstice', emoji: '☀️', type: 'solar' },
+        { date: '2026-07-03', name: 'Supermoon', emoji: '🌕', type: 'moon' },
+        { date: '2026-08-08', name: 'Annular Solar Eclipse', emoji: '🌖', type: 'eclipse' },
+        { date: '2026-08-12', name: 'Perseids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2026-08-28', name: 'Total Solar Eclipse', emoji: '🌑☀️', type: 'eclipse' },
+        { date: '2026-09-22', name: 'Autumn Equinox', emoji: '🍂', type: 'solar' },
+        { date: '2026-10-21', name: 'Orionids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2026-11-04', name: 'Jupiter at Opposition', emoji: '🌟', type: 'planet' },
+        { date: '2026-11-17', name: 'Leonids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2026-12-14', name: 'Geminids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2026-12-21', name: 'Winter Solstice', emoji: '❄️', type: 'solar' },
+        // 2027
+        { date: '2027-01-03', name: 'Quadrantids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2027-02-06', name: 'Annular Solar Eclipse', emoji: '🌖', type: 'eclipse' },
+        { date: '2027-02-20', name: 'Penumbral Lunar Eclipse', emoji: '🌘', type: 'eclipse' },
+        { date: '2027-03-20', name: 'Spring Equinox', emoji: '🌸', type: 'solar' },
+        { date: '2027-06-21', name: 'Summer Solstice', emoji: '☀️', type: 'solar' },
+        { date: '2027-07-18', name: 'Total Lunar Eclipse', emoji: '🌑', type: 'eclipse' },
+        { date: '2027-08-02', name: 'Total Solar Eclipse', emoji: '🌑☀️', type: 'eclipse' },
+        { date: '2027-08-12', name: 'Perseids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2027-09-22', name: 'Autumn Equinox', emoji: '🍂', type: 'solar' },
+        { date: '2027-12-14', name: 'Geminids Meteor Shower Peak', emoji: '☄️', type: 'meteor' },
+        { date: '2027-12-21', name: 'Winter Solstice', emoji: '❄️', type: 'solar' },
+    ];
+
+    // ─── 3. Zodiac season transitions (recurring yearly) ───
+    const zodiacTransitions = [
+        { month: 0, day: 20, name: 'Aquarius Season Begins', emoji: '♒' },
+        { month: 1, day: 19, name: 'Pisces Season Begins', emoji: '♓' },
+        { month: 2, day: 20, name: 'Aries Season Begins', emoji: '♈' },
+        { month: 3, day: 20, name: 'Taurus Season Begins', emoji: '♉' },
+        { month: 4, day: 21, name: 'Gemini Season Begins', emoji: '♊' },
+        { month: 5, day: 21, name: 'Cancer Season Begins', emoji: '♋' },
+        { month: 6, day: 23, name: 'Leo Season Begins', emoji: '♌' },
+        { month: 7, day: 23, name: 'Virgo Season Begins', emoji: '♍' },
+        { month: 8, day: 23, name: 'Libra Season Begins', emoji: '♎' },
+        { month: 9, day: 23, name: 'Scorpio Season Begins', emoji: '♏' },
+        { month: 10, day: 22, name: 'Sagittarius Season Begins', emoji: '♐' },
+        { month: 11, day: 22, name: 'Capricorn Season Begins', emoji: '♑' },
+    ];
+
+    // ─── Compile: scan 30 days ahead ───
+    const allUpcoming = [...liveEvents];
+
+    for (let i = 0; i <= 30; i++) {
+        const checkDate = new Date(date);
+        checkDate.setDate(checkDate.getDate() + i);
+        const checkStr = checkDate.toISOString().split('T')[0];
+        const cm = checkDate.getMonth();
+        const cd = checkDate.getDate();
+
+        // Check known events
+        knownEvents.forEach(e => {
+            if (e.date === checkStr) {
+                allUpcoming.push({ ...e, daysAway: i });
+            }
+        });
+
+        // Check zodiac transitions
+        zodiacTransitions.forEach(e => {
+            if (e.month === cm && e.day === cd) {
+                allUpcoming.push({ ...e, daysAway: i, type: 'zodiac' });
+            }
+        });
+
+        // Auto-detect alignments for future dates (check every 3 days to stay performant)
+        if (i > 0 && i % 3 === 0) {
+            const futureAlignments = detectPlanetaryAlignments(checkDate);
+            futureAlignments.forEach(e => {
+                // Only add if we don't already have a similar event
+                const isDuplicate = allUpcoming.some(existing =>
+                    existing.type === e.type && existing.name === e.name
+                );
+                if (!isDuplicate) {
+                    allUpcoming.push({ ...e, daysAway: i });
+                }
+            });
+        }
+    }
+
+    // Deduplicate by name (keep closest)
+    const seen = new Map();
+    allUpcoming.forEach(e => {
+        const key = e.name;
+        if (!seen.has(key) || e.daysAway < seen.get(key).daysAway) {
+            seen.set(key, e);
+        }
+    });
+
+    // Sort by daysAway then priority
+    return Array.from(seen.values()).sort((a, b) => {
+        if (a.daysAway !== b.daysAway) return a.daysAway - b.daysAway;
+        return (a.priority || 5) - (b.priority || 5);
+    });
 }

@@ -12,6 +12,7 @@ import Profile from './components/Profile';
 import Login from './components/Login';
 import Onboarding, { generateCosmicName } from './components/Onboarding';
 import DailyBriefing from './components/DailyBriefing';
+import DailyCheckin from './components/DailyBriefing/DailyCheckin';
 import { DEFAULT_CYCLE, getCycleInfo, detectIrregularities } from './utils/cycleEngine';
 import { getMoonPhase, getZodiacSign, getNoosphereIndex, getNatalChart } from './utils/cosmicEngine';
 import { generateGlobalUsers, calculateSyncScores, getSyncStats } from './utils/syncEngine';
@@ -46,6 +47,7 @@ export default function App() {
     const [userProfile, setUserProfile] = useState(null);
     const [hasOnboarded, setHasOnboarded] = useState(false);
     const [showBriefing, setShowBriefing] = useState(false);
+    const [showCheckin, setShowCheckin] = useState(false);
     const [currentPage, setCurrentPage] = useState('dashboard');
     const [transitioning, setTransitioning] = useState(false);
     const [cycleData, setCycleData] = useState(DEFAULT_CYCLE);
@@ -117,7 +119,12 @@ export default function App() {
         if (firebaseUser && hasOnboarded) {
             const today = new Date().toISOString().split('T')[0];
             getDailyLog(firebaseUser.uid, today).then(log => {
-                if (log) setDailyLog(prev => ({ ...DEFAULT_DAILY_LOG, ...log }));
+                if (log) {
+                    setDailyLog(prev => ({ ...DEFAULT_DAILY_LOG, ...log }));
+                } else {
+                    // No log for today — show daily check-in
+                    setShowCheckin(true);
+                }
             });
             // Load log history
             getDailyLogs(firebaseUser.uid, 60).then(logs => {
@@ -144,7 +151,7 @@ export default function App() {
         setCycleData(newCycleData);
         if (bd) setBirthData(bd);
         setHasOnboarded(true);
-        setShowBriefing(true);
+        setShowCheckin(true);
 
         if (firebaseUser?.uid && firebaseUser.uid !== 'demo') {
             try {
@@ -157,6 +164,18 @@ export default function App() {
     };
 
     const handleDismissBriefing = () => setShowBriefing(false);
+
+    const handleCheckinComplete = (data) => {
+        const newLog = { ...dailyLog, flow: data.flow, mood: data.mood, symptoms: data.symptoms };
+        handleSetDailyLog(newLog);
+        setShowCheckin(false);
+        setShowBriefing(true); // Then show briefing
+    };
+
+    const handleCheckinSkip = () => {
+        setShowCheckin(false);
+        setShowBriefing(true);
+    };
 
     const handleLogOut = async () => {
         try { await logOut(); } catch (err) { console.warn('Logout error:', err); }
@@ -236,7 +255,6 @@ export default function App() {
     const cosmicName = birthData?.cosmicName || generateCosmicName(firebaseUser?.uid);
     const user = firebaseUser ? {
         name: cosmicName,
-        realName: birthData?.name || null,
         email: firebaseUser.email,
         avatar: firebaseUser.photoURL || '🌙',
         provider: firebaseUser.providerData?.[0]?.providerId || 'email',
@@ -303,6 +321,15 @@ export default function App() {
                     <PageComponent />
                 </main>
             </div>
+
+            {showCheckin && (
+                <DailyCheckin
+                    cycleInfo={cycleInfo}
+                    moonData={moonData}
+                    onComplete={handleCheckinComplete}
+                    onSkip={handleCheckinSkip}
+                />
+            )}
 
             {showBriefing && (
                 <DailyBriefing

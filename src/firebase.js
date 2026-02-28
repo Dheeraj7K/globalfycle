@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp, onSnapshot, limit, deleteDoc } from 'firebase/firestore';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -20,6 +20,7 @@ export const db = getFirestore(app);
 
 // ─── Auth Providers ───
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 const appleProvider = new OAuthProvider('apple.com');
 
 // ─── Auth Functions ───
@@ -184,3 +185,31 @@ export async function deleteUserAccount(uid) {
     }
 }
 
+// ─── Live Chat ───
+export async function sendChatMessage(roomId, { uid, cosmicName, text, cyclePhase }) {
+    const ref = collection(db, 'chatRooms', roomId, 'messages');
+    await addDoc(ref, {
+        uid,
+        cosmicName,
+        text: text.slice(0, 500), // limit length
+        cyclePhase: cyclePhase || null,
+        createdAt: serverTimestamp(),
+    });
+}
+
+export function subscribeToChatRoom(roomId, callback, msgLimit = 80) {
+    const ref = collection(db, 'chatRooms', roomId, 'messages');
+    const q = query(ref, orderBy('createdAt', 'asc'), limit(msgLimit));
+    return onSnapshot(q, (snapshot) => {
+        const messages = snapshot.docs.map(d => ({
+            id: d.id,
+            ...d.data(),
+            createdAt: d.data().createdAt?.toDate?.() || new Date(),
+        }));
+        callback(messages);
+    });
+}
+
+export async function deleteChatMessage(roomId, messageId) {
+    await deleteDoc(doc(db, 'chatRooms', roomId, 'messages', messageId));
+}

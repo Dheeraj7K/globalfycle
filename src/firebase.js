@@ -213,3 +213,45 @@ export function subscribeToChatRoom(roomId, callback, msgLimit = 80) {
 export async function deleteChatMessage(roomId, messageId) {
     await deleteDoc(doc(db, 'chatRooms', roomId, 'messages', messageId));
 }
+
+// ─── Community Posts ───
+export async function sendCommunityPost(groupId, { uid, cosmicName, text }) {
+    const ref = collection(db, 'communities', groupId, 'posts');
+    await addDoc(ref, {
+        uid,
+        cosmicName,
+        text: text.slice(0, 1000),
+        likes: 0,
+        replies: 0,
+        createdAt: serverTimestamp(),
+    });
+}
+
+export function subscribeToCommunityPosts(groupId, callback, postLimit = 50) {
+    const ref = collection(db, 'communities', groupId, 'posts');
+    const q = query(ref, orderBy('createdAt', 'desc'), limit(postLimit));
+    return onSnapshot(q, (snapshot) => {
+        const posts = snapshot.docs.map(d => ({
+            id: d.id,
+            ...d.data(),
+            author: d.data().cosmicName,
+            createdAt: d.data().createdAt?.toDate?.() || new Date(),
+            timeAgo: timeAgoFromDate(d.data().createdAt?.toDate?.() || new Date()),
+            isOwn: false, // will be set by component
+        }));
+        callback(posts);
+    });
+}
+
+export async function deleteCommunityPost(groupId, postId) {
+    await deleteDoc(doc(db, 'communities', groupId, 'posts', postId));
+}
+
+function timeAgoFromDate(date) {
+    const now = new Date();
+    const diff = Math.floor((now - date) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+}

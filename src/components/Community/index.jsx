@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../App';
 import LiveChat from './LiveChat';
+import { sendCommunityPost, subscribeToCommunityPosts, deleteCommunityPost } from '../../firebase';
 
 // ─── Seeded random for stable community data ───
 function seededRandom(seed) {
@@ -116,7 +117,8 @@ export default function Community() {
     });
     const [selectedGroup, setSelectedGroup] = useState(null);
     const [newMessage, setNewMessage] = useState('');
-    const [localMessages, setLocalMessages] = useState({});
+    const [firestorePosts, setFirestorePosts] = useState([]);
+    const [sending, setSending] = useState(false);
     const [reactions, setReactions] = useState(() => {
         try { return JSON.parse(localStorage.getItem('fycle_reactions') || '{}'); }
         catch { return {}; }
@@ -149,22 +151,29 @@ export default function Community() {
         setJoinedGroups(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
     };
 
-    const sendMessage = (groupId) => {
-        if (!newMessage.trim()) return;
-        const msg = {
-            id: Date.now(),
-            author: user?.name || 'Cosmic Soul',
-            text: newMessage.trim(),
-            timeAgo: 'just now',
-            likes: 0,
-            replies: 0,
-            isOwn: true,
-        };
-        setLocalMessages(prev => ({
-            ...prev,
-            [groupId]: [...(prev[groupId] || []), msg],
-        }));
-        setNewMessage('');
+    // Subscribe to Firestore posts when a group is selected
+    useEffect(() => {
+        if (!selectedGroup) { setFirestorePosts([]); return; }
+        const unsubscribe = subscribeToCommunityPosts(selectedGroup, (posts) => {
+            setFirestorePosts(posts.map(p => ({ ...p, isOwn: p.uid === user?.uid })));
+        });
+        return () => unsubscribe();
+    }, [selectedGroup, user?.uid]);
+
+    const sendMessage = async (groupId) => {
+        if (!newMessage.trim() || !user || sending) return;
+        setSending(true);
+        try {
+            await sendCommunityPost(groupId, {
+                uid: user.uid,
+                cosmicName: user.name,
+                text: newMessage.trim(),
+            });
+            setNewMessage('');
+        } catch (err) {
+            console.error('Failed to send community post:', err);
+        }
+        setSending(false);
     };
 
     return (
@@ -232,7 +241,8 @@ export default function Community() {
             {activeTab === 'groups' && selectedGroup && (() => {
                 const group = COMMUNITIES.find(g => g.id === selectedGroup);
                 if (!group) return null;
-                const posts = [...generatePosts(group.id, user?.name), ...(localMessages[group.id] || [])];
+                const seededPosts = generatePosts(group.id, user?.name);
+                const posts = [...firestorePosts, ...seededPosts];
                 return (
                     <div>
                         <button className="btn btn-ghost btn-sm" onClick={() => setSelectedGroup(null)}

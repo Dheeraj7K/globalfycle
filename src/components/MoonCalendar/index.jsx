@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { useApp } from '../App';
-import { getMoonPhasesForMonth, getMoonPhase } from '../utils/cosmicEngine';
-import { getCycleDayForDate } from '../utils/cycleEngine';
+import { useApp } from '../../App';
+import { getMoonPhasesForMonth, getMoonPhase } from '../../utils/cosmicEngine';
+import { getCycleDayForDate } from '../../utils/cycleEngine';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];

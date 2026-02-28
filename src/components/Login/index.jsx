@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail } from '../firebase';
+import { signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail } from '../../firebase';
 
 export default function Login({ onLogin, moonData }) {
     const [animating, setAnimating] = useState(false);

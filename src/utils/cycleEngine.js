@@ -122,15 +122,26 @@ export function getCycleInfo(lastPeriodStart, cycleLength = 28, periodLength = 5
     }
 
     const phaseData = PHASES[phase];
-    const daysUntilNextPeriod = cycleLength - adjustedDay;
+    const daysUntilNextPeriod = Math.max(0, cycleLength - adjustedDay);
     const ovulationDay = Math.floor(cycleLength / 2);
     const daysUntilOvulation = ovulationDay - adjustedDay;
     const fertileWindowStart = ovulationDay - 5;
     const fertileWindowEnd = ovulationDay + 1;
     const isFertile = adjustedDay >= fertileWindowStart && adjustedDay <= fertileWindowEnd;
 
+    // Fertility status label
+    let fertilityStatus = 'Low';
+    if (adjustedDay === ovulationDay) fertilityStatus = 'Peak';
+    else if (isFertile) fertilityStatus = 'High';
+    else if (Math.abs(adjustedDay - ovulationDay) <= 3) fertilityStatus = 'Medium';
+
     // Calculate cycle progress percentage
     const progressPercent = (adjustedDay / cycleLength) * 100;
+
+    // Dynamic phase boundaries (for cycle wheel visualization)
+    const follicularEnd = periodLength / cycleLength;
+    const ovulationStart = Math.floor(cycleLength * 0.46) / cycleLength;
+    const ovulationEnd = Math.floor(cycleLength * 0.54) / cycleLength;
 
     // Biorhythm harmonics (simplified sine wave calculations)
     const physicalBio = Math.sin((2 * Math.PI * dayOfCycle) / 23) * 100;
@@ -164,10 +175,12 @@ export function getCycleInfo(lastPeriodStart, cycleLength = 28, periodLength = 5
         daysUntilNextPeriod,
         daysUntilOvulation: daysUntilOvulation > 0 ? daysUntilOvulation : daysUntilOvulation + cycleLength,
         isFertile,
+        fertilityStatus,
         fertileWindowStart,
         fertileWindowEnd,
         ovulationDay,
         progressPercent,
+        phaseBoundaries: { follicularEnd, ovulationStart, ovulationEnd },
         biorhythm: {
             physical: Math.round(physicalBio),
             emotional: Math.round(emotionalBio),
@@ -295,6 +308,81 @@ export const EMERGENCY_CONTRACEPTIVE_OPTIONS = [
     { id: 'taken_recently', emoji: '📅', label: 'Taken Recently' },
     { id: 'none', emoji: '—', label: 'Not Taken' },
 ];
+
+// ─── Lifestyle Tracking Options ───
+export const SLEEP_OPTIONS = [
+    { id: 'great', emoji: '😴', label: 'Great (7-9h)' },
+    { id: 'good', emoji: '😊', label: 'Good (6-7h)' },
+    { id: 'fair', emoji: '😐', label: 'Fair (5-6h)' },
+    { id: 'poor', emoji: '😫', label: 'Poor (<5h)' },
+    { id: 'insomnia', emoji: '🌙', label: 'Insomnia' },
+];
+
+export const EXERCISE_OPTIONS = [
+    { id: 'intense', emoji: '🏋️', label: 'Intense' },
+    { id: 'moderate', emoji: '🏃', label: 'Moderate' },
+    { id: 'light', emoji: '🚶', label: 'Light / Walk' },
+    { id: 'yoga', emoji: '🧘', label: 'Yoga / Stretch' },
+    { id: 'rest', emoji: '🛋️', label: 'Rest Day' },
+];
+
+export const STRESS_OPTIONS = [
+    { id: 'very_low', emoji: '😌', label: 'Very Low' },
+    { id: 'low', emoji: '🙂', label: 'Low' },
+    { id: 'moderate', emoji: '😐', label: 'Moderate' },
+    { id: 'high', emoji: '😰', label: 'High' },
+    { id: 'very_high', emoji: '🤯', label: 'Very High' },
+];
+
+// ─── Irregularity Detection ───
+export function detectIrregularities(periodLogs, expectedCycleLength = 28) {
+    if (!periodLogs || periodLogs.length < 2) return { irregular: false, alerts: [] };
+
+    const alerts = [];
+    const cycleLengths = [];
+
+    // Calculate cycle lengths from consecutive period starts
+    const sorted = [...periodLogs].sort((a, b) => a.startDate.localeCompare(b.startDate));
+    for (let i = 1; i < sorted.length; i++) {
+        const prev = new Date(sorted[i - 1].startDate);
+        const curr = new Date(sorted[i].startDate);
+        const days = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
+        if (days > 0 && days < 90) cycleLengths.push(days);
+    }
+
+    if (cycleLengths.length === 0) return { irregular: false, alerts: [], cycleLengths: [] };
+
+    const avg = Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length);
+    const latest = cycleLengths[cycleLengths.length - 1];
+
+    // Check for short cycles
+    if (latest < 21) {
+        alerts.push({ type: 'warning', message: `Your latest cycle was only ${latest} days — shorter than typical (21-35 days).` });
+    }
+    // Check for long cycles
+    if (latest > 38) {
+        alerts.push({ type: 'warning', message: `Your latest cycle was ${latest} days — longer than typical (21-35 days).` });
+    }
+    // Check for deviation from average
+    if (cycleLengths.length >= 3 && Math.abs(latest - avg) > 5) {
+        alerts.push({ type: 'info', message: `Your latest cycle (${latest}d) deviated ${Math.abs(latest - avg)} days from your average (${avg}d).` });
+    }
+    // Check for high variability
+    if (cycleLengths.length >= 3) {
+        const variance = cycleLengths.reduce((sum, l) => sum + Math.pow(l - avg, 2), 0) / cycleLengths.length;
+        if (Math.sqrt(variance) > 5) {
+            alerts.push({ type: 'info', message: 'Your cycle lengths have been variable. This is common but worth monitoring.' });
+        }
+    }
+
+    return {
+        irregular: alerts.some(a => a.type === 'warning'),
+        alerts,
+        cycleLengths,
+        averageCycleLength: avg,
+        latestCycleLength: latest,
+    };
+}
 
 // Seasonal shift prediction
 export function getSeasonalShift(month) {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp } from '../App';
+import { useApp } from '../../App';
 
 export default function Community() {
     const [activeTab, setActiveTab] = useState('groups');

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../App';
-import { saveJournalEntry, getJournalEntries } from '../firebase';
+import { useApp } from '../../App';
+import { saveJournalEntry, getJournalEntries } from '../../firebase';
 
 const FEED_ITEMS = [
     { id: 1, emoji: '🧘', title: 'Menstrual Phase Yoga', desc: 'Gentle yin poses to honor your body during menstruation. Hold each for 3-5 breaths.', category: 'Movement', height: 180 },
@@ -78,7 +78,11 @@ export default function SpiritualEvolution() {
 
     // XP is derived from completed rituals + journal entries
     const currentXP = completedRituals.reduce((sum, r) => sum + r.xp, 0) + (journalEntries.length * 15);
-    const currentLevel = LEVELS.find((_, i) => i + 1 < LEVELS.length && currentXP >= LEVELS[i].xp && currentXP < LEVELS[i + 1].xp) || LEVELS[0];
+    // Find the highest level the user qualifies for (iterate backward)
+    let currentLevel = LEVELS[0];
+    for (let i = LEVELS.length - 1; i >= 0; i--) {
+        if (currentXP >= LEVELS[i].xp) { currentLevel = LEVELS[i]; break; }
+    }
     const nextLevel = LEVELS[LEVELS.indexOf(currentLevel) + 1] || LEVELS[LEVELS.length - 1];
     const progress = nextLevel.xp > currentLevel.xp ? ((currentXP - currentLevel.xp) / (nextLevel.xp - currentLevel.xp)) * 100 : 100;
 

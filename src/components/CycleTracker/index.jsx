@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../App';
+import { useApp } from '../../App';
 import {
     SYMPTOMS, MOODS, FLOW_LEVELS,
     DISCHARGE_OPTIONS, SEX_OPTIONS, SEX_DRIVE_OPTIONS,
     DIGESTIVE_OPTIONS, PREGNANCY_TEST_OPTIONS, OVULATION_TEST_OPTIONS,
     CONTRACEPTIVE_OPTIONS, EMERGENCY_CONTRACEPTIVE_OPTIONS,
-} from '../utils/cycleEngine';
-import { getDailyLog } from '../firebase';
+    SLEEP_OPTIONS, EXERCISE_OPTIONS, STRESS_OPTIONS,
+} from '../../utils/cycleEngine';
+import { getDailyLog } from '../../firebase';
 
 function Section({ title, icon, children, defaultOpen = false }) {
     const [open, setOpen] = useState(defaultOpen);
@@ -40,7 +41,7 @@ function OptionGrid({ options, selected, onSelect, multi = false }) {
 }
 
 export default function CycleTracker() {
-    const { cycleInfo, dailyLog, setDailyLog, cycleData, setCycleData, user, periodLogs, logHistory, handlePeriodLog } = useApp();
+    const { cycleInfo, dailyLog, setDailyLog, cycleData, setCycleData, user, periodLogs, logHistory, handlePeriodLog, irregularityData } = useApp();
     const [activeTab, setActiveTab] = useState('log');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [localLog, setLocalLog] = useState({ ...dailyLog });
@@ -221,6 +222,18 @@ export default function CycleTracker() {
                             <Section title="Emergency Contraceptive" icon="🆘">
                                 <OptionGrid options={EMERGENCY_CONTRACEPTIVE_OPTIONS} selected={localLog.emergencyContraceptive} onSelect={(id) => updateLocal('emergencyContraceptive', localLog.emergencyContraceptive === id ? null : id)} />
                             </Section>
+
+                            <Section title="Sleep Quality" icon="😴">
+                                <OptionGrid options={SLEEP_OPTIONS} selected={localLog.sleep} onSelect={(id) => updateLocal('sleep', localLog.sleep === id ? null : id)} />
+                            </Section>
+
+                            <Section title="Exercise" icon="🏃">
+                                <OptionGrid options={EXERCISE_OPTIONS} selected={localLog.exercise} onSelect={(id) => updateLocal('exercise', localLog.exercise === id ? null : id)} />
+                            </Section>
+
+                            <Section title="Stress Level" icon="😰">
+                                <OptionGrid options={STRESS_OPTIONS} selected={localLog.stress} onSelect={(id) => updateLocal('stress', localLog.stress === id ? null : id)} />
+                            </Section>
                         </div>
                     </div>
 
@@ -318,6 +331,76 @@ export default function CycleTracker() {
                         </div>
                     </div>
 
+                    {/* Irregularity Alerts */}
+                    {irregularityData?.alerts?.length > 0 && (
+                        <div style={{ marginBottom: 20 }}>
+                            <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>⚠️ Cycle Alerts</div>
+                            {irregularityData.alerts.map((a, i) => (
+                                <div key={i} style={{
+                                    padding: '10px 14px', marginBottom: 6, borderRadius: 10,
+                                    background: a.type === 'warning' ? 'rgba(255,45,120,0.08)' : 'rgba(168,85,247,0.08)',
+                                    borderLeft: `3px solid ${a.type === 'warning' ? '#ff2d78' : '#a855f7'}`,
+                                    fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)',
+                                }}>{a.message}</div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Symptom Frequency Chart */}
+                    {logHistory.length > 0 && (() => {
+                        const symptomFreq = {};
+                        logHistory.forEach(log => {
+                            if (log.symptoms) log.symptoms.forEach(s => { symptomFreq[s] = (symptomFreq[s] || 0) + 1; });
+                        });
+                        const sortedSymptoms = Object.entries(symptomFreq).sort((a, b) => b[1] - a[1]).slice(0, 8);
+                        if (sortedSymptoms.length === 0) return null;
+                        const maxFreq = sortedSymptoms[0][1];
+                        return (
+                            <div style={{ marginBottom: 20 }}>
+                                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>📊 Top Symptoms</div>
+                                {sortedSymptoms.map(([id, count]) => {
+                                    const sym = SYMPTOMS.find(s => s.id === id);
+                                    return (
+                                        <div key={id} style={{ marginBottom: 8 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 3 }}>
+                                                <span style={{ color: 'rgba(255,255,255,0.6)' }}>{sym?.emoji} {sym?.label || id}</span>
+                                                <span style={{ color: '#ff2d78' }}>{count}x</span>
+                                            </div>
+                                            <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3 }}>
+                                                <div style={{ height: '100%', borderRadius: 3, background: 'linear-gradient(90deg, #ff2d78, #a855f7)', width: `${(count / maxFreq) * 100}%`, transition: 'width 0.5s ease' }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
+
+                    {/* Mood Pattern */}
+                    {logHistory.length > 0 && (() => {
+                        const moodFreq = {};
+                        logHistory.forEach(log => { if (log.mood) moodFreq[log.mood] = (moodFreq[log.mood] || 0) + 1; });
+                        const sorted = Object.entries(moodFreq).sort((a, b) => b[1] - a[1]);
+                        if (sorted.length === 0) return null;
+                        return (
+                            <div style={{ marginBottom: 20 }}>
+                                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>😊 Mood Patterns</div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                    {sorted.map(([id, count]) => {
+                                        const m = MOODS.find(x => x.id === id);
+                                        return (
+                                            <div key={id} style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, textAlign: 'center' }}>
+                                                <div style={{ fontSize: '1.2rem' }}>{m?.emoji || '😐'}</div>
+                                                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)' }}>{m?.label || id}</div>
+                                                <div style={{ fontSize: '0.7rem', color: '#00f5d4', fontWeight: 600 }}>{count}x</div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })()}
+
                     {/* Period Logs */}
                     {periodLogs.length > 0 && (
                         <div style={{ marginBottom: 20 }}>
@@ -346,6 +429,9 @@ export default function CycleTracker() {
                                     if (entry.mood) parts.push(`Mood: ${MOODS.find(m => m.id === entry.mood)?.label || entry.mood}`);
                                     if (entry.symptoms?.length) parts.push(`${entry.symptoms.length} symptom${entry.symptoms.length > 1 ? 's' : ''}`);
                                     if (entry.discharge) parts.push(`Discharge: ${entry.discharge}`);
+                                    if (entry.sleep) parts.push(`Sleep: ${SLEEP_OPTIONS.find(s => s.id === entry.sleep)?.label || entry.sleep}`);
+                                    if (entry.exercise) parts.push(`Exercise: ${EXERCISE_OPTIONS.find(e => e.id === entry.exercise)?.label || entry.exercise}`);
+                                    if (entry.stress) parts.push(`Stress: ${STRESS_OPTIONS.find(s => s.id === entry.stress)?.label || entry.stress}`);
                                     if (entry.contraceptive && entry.contraceptive !== 'na') parts.push(`Pill: ${entry.contraceptive}`);
                                     return (
                                         <div key={i} className="timeline-item">

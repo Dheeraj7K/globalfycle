@@ -12,10 +12,10 @@ import Profile from './components/Profile';
 import Login from './components/Login';
 import Onboarding, { generateCosmicName } from './components/Onboarding';
 import DailyBriefing from './components/DailyBriefing';
-import { DEFAULT_CYCLE, getCycleInfo } from './utils/cycleEngine';
+import { DEFAULT_CYCLE, getCycleInfo, detectIrregularities } from './utils/cycleEngine';
 import { getMoonPhase, getZodiacSign, getNoosphereIndex, getNatalChart } from './utils/cosmicEngine';
 import { generateGlobalUsers, calculateSyncScores, getSyncStats } from './utils/syncEngine';
-import { onAuthChange, getUserProfile, saveCycleData, saveBirthData, saveDailyLog, getDailyLog, getDailyLogs, savePeriodLog, getPeriodLogs, logOut } from './firebase';
+import { onAuthChange, getUserProfile, saveCycleData, saveBirthData, saveDailyLog, getDailyLog, getDailyLogs, savePeriodLog, getPeriodLogs, logOut, deleteUserAccount } from './firebase';
 
 // Global app context
 export const AppContext = createContext();
@@ -35,6 +35,9 @@ const DEFAULT_DAILY_LOG = {
     ovulationTest: null,
     contraceptive: null,
     emergencyContraceptive: null,
+    sleep: null,
+    exercise: null,
+    stress: null,
 };
 
 export default function App() {
@@ -50,6 +53,7 @@ export default function App() {
     const [birthData, setBirthData] = useState(null);
     const [periodLogs, setPeriodLogs] = useState([]);
     const [logHistory, setLogHistory] = useState([]);
+    const [userLocation, setUserLocation] = useState(null);
 
     // Computed data
     const cycleInfo = getCycleInfo(cycleData.lastPeriodStart, cycleData.cycleLength, cycleData.periodLength);
@@ -61,6 +65,20 @@ export default function App() {
     // Global users (generated once)
     const [globalUsers, setGlobalUsers] = useState([]);
     const [syncStats, setSyncStats] = useState(null);
+
+    // Irregularity detection
+    const irregularityData = detectIrregularities(periodLogs, cycleData.cycleLength);
+
+    // ─── Get User Location ───
+    useEffect(() => {
+        if ('geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                () => setUserLocation(null), // Permission denied or error — stay null
+                { enableHighAccuracy: false, timeout: 10000 }
+            );
+        }
+    }, []);
 
     // ─── Firebase Auth Listener ───
     useEffect(() => {
@@ -142,6 +160,24 @@ export default function App() {
 
     const handleLogOut = async () => {
         try { await logOut(); } catch (err) { console.warn('Logout error:', err); }
+        setCurrentPage('dashboard');
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!firebaseUser?.uid) return;
+        try {
+            await deleteUserAccount(firebaseUser.uid);
+            // State will be cleared by onAuthChange listener after successful deletion/logout
+            setCurrentPage('dashboard');
+        } catch (err) {
+            console.error('Delete account failed:', err);
+            // If re-authentication required, log out first
+            if (err.code === 'auth/requires-recent-login') {
+                await logOut();
+                // State will be cleared by onAuthChange listener after successful logout
+                setCurrentPage('dashboard');
+            }
+        }
     };
 
     // Save daily log with Firestore sync
@@ -212,9 +248,10 @@ export default function App() {
     const contextValue = {
         user, cycleData, setCycleData, cycleInfo, moonData, zodiac, noosphere,
         globalUsers, syncStats, dailyLog, setDailyLog: handleSetDailyLog, currentPage,
-        setCurrentPage: navigateTo, logOut: handleLogOut,
+        setCurrentPage: navigateTo, logOut: handleLogOut, deleteAccount: handleDeleteAccount,
         showBriefing: () => setShowBriefing(true),
         birthData, natalChart, periodLogs, logHistory, handlePeriodLog,
+        userLocation, irregularityData,
     };
 
     // Loading screen

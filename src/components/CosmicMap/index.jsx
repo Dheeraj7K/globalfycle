@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useApp } from '../App';
-import { getPlanetaryPositions, getRetrogrades, getCosmicEvents, getZodiacSign } from '../utils/cosmicEngine';
+import { useApp } from '../../App';
+import { getPlanetaryPositions, getRetrogrades, getCosmicEvents, getZodiacSign } from '../../utils/cosmicEngine';
 
 export default function CosmicMap() {
     const { moonData, zodiac, cycleInfo, noosphere } = useApp();
@@ -79,8 +79,8 @@ export default function CosmicMap() {
                             {/* Moon */}
                             {(() => {
                                 const moonAngle = (moonData.phase / 29.53 * 360 + rotation * 3) * Math.PI / 180;
-                                const mx = 40 * Math.cos(moonAngle) + planets[2]?.x || 0;
-                                const my = 40 * Math.sin(moonAngle) + planets[2]?.y || 0;
+                                const mx = 40 * Math.cos(moonAngle) + (planets[2]?.x ?? 0);
+                                const my = 40 * Math.sin(moonAngle) + (planets[2]?.y ?? 0);
                                 return (
                                     <g>
                                         <circle cx={mx} cy={my} r="4" fill="#e0e0e0" />

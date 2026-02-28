@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-import { useApp } from '../App';
+import { useApp } from '../../App';
 
 export default function GlobalSyncMap() {
-    const { globalUsers, syncStats, cycleInfo, user } = useApp();
+    const { globalUsers, syncStats, cycleInfo, user, userLocation } = useApp();
     const [filter, setFilter] = useState('synced');
     const [livePulse, setLivePulse] = useState(true);
     const [liveCount, setLiveCount] = useState(0);
@@ -79,7 +79,7 @@ export default function GlobalSyncMap() {
                         <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
 
                         {/* Your location marker */}
-                        <CircleMarker center={[20.5937, 78.9629]} radius={10}
+                        <CircleMarker center={userLocation ? [userLocation.lat, userLocation.lng] : [20.5937, 78.9629]} radius={10}
                             pathOptions={{ color: '#ffd700', fillColor: '#ffd700', fillOpacity: 0.8, weight: 3 }}>
                             <Popup>
                                 <div style={{ color: '#e0d6ff', fontFamily: "'Inter', sans-serif", minWidth: 160 }}>
@@ -114,7 +114,7 @@ export default function GlobalSyncMap() {
                                         </div>
                                         {u.isExactTwin && <div style={{ fontSize: '0.75rem', color: '#ffd700', fontWeight: 600 }}>✨ Cycle Twin!</div>}
                                         <div style={{ marginTop: 6, fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)' }}>
-                                            Active {Math.floor(Math.random() * 60) + 1}m ago
+                                            Active {u.lastActiveMinutes}m ago
                                         </div>
                                     </div>
                                 </Popup>
@@ -171,7 +171,7 @@ export default function GlobalSyncMap() {
                                     {u.phaseData?.name}
                                 </span>
                                 <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)' }}>
-                                    {Math.floor(Math.random() * 30) + 1}m ago
+                                    {u.lastActiveMinutes}m ago
                                 </span>
                             </div>
                         ))}

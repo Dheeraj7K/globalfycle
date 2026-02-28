@@ -160,3 +160,27 @@ export async function getJournalEntries(uid, limit = 20) {
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() })).slice(0, limit);
 }
+
+// ─── Delete Account ───
+export async function deleteUserAccount(uid) {
+    try {
+        // Delete subcollections
+        const subcollections = ['dailyLogs', 'periodLogs', 'journal'];
+        for (const sub of subcollections) {
+            const ref = collection(db, 'users', uid, sub);
+            const snap = await getDocs(query(ref));
+            for (const d of snap.docs) {
+                await setDoc(doc(db, 'users', uid, sub, d.id), { _deleted: true }); // soft-delete marker
+            }
+        }
+        // Delete user document
+        await setDoc(doc(db, 'users', uid), { _deleted: true, deletedAt: serverTimestamp() });
+        // Delete Firebase auth account
+        const user = auth.currentUser;
+        if (user) await user.delete();
+    } catch (err) {
+        console.error('Account deletion error:', err);
+        throw err;
+    }
+}
+
